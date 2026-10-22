@@ -1,4 +1,4 @@
-const MODELO = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+const MODELO = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
 const TIMEOUT_MS = 20000;
 const DATA_URL = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/;
 
@@ -61,7 +61,14 @@ async function clasificarConIA(dataUrl, categorias) {
   );
 
   if (!respuesta.ok) {
-    throw new Error(`Gemini respondió ${respuesta.status}.`);
+    let mensaje = '';
+    try {
+      const error = await respuesta.json();
+      mensaje = error?.error?.message || '';
+    } catch {
+      mensaje = '';
+    }
+    throw new Error(`Gemini respondió ${respuesta.status}${mensaje ? `: ${mensaje.slice(0, 300)}` : '.'}`);
   }
 
   const json = await respuesta.json();
