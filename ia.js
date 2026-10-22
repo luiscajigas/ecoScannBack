@@ -1,5 +1,5 @@
 const MODELO = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
-const TIMEOUT_MS = 20000;
+const TIMEOUT_MS = 45000;
 const DATA_URL = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/;
 
 function iaDisponible() {
