@@ -1,6 +1,7 @@
 const express = require('express');
 const { db } = require('../db');
 const { requiereAuth } = require('../middleware/auth');
+const { iaDisponible, clasificarConIA } = require('../ia');
 
 const router = express.Router();
 
@@ -57,24 +58,37 @@ router.get('/escaneos', requiereAuth, async (req, res) => {
 
 /**
  * POST /api/escaneos
- * Registra un escaneo. La CLASIFICACIÓN en sí ya viene calculada por el
- * Web Worker del frontend (heurística de color dominante, sin IA todavía)
- * -el backend valida, persiste, otorga puntos y devuelve las
- * instrucciones de desecho-.
+ * Registra un escaneo. Si llega la imagen comprimida y la IA está
+ * configurada, Gemini clasifica el residuo; si no está disponible o falla,
+ * se usa la heurística de color calculada por el Web Worker.
  *
- * Body: { categoriaClave, confianza, anchoPx, altoPx }
+ * Body: { categoriaClave, confianza, anchoPx, altoPx, imagenBase64? }
  */
 router.post('/escaneos', requiereAuth, async (req, res) => {
-  const { categoriaClave, confianza, anchoPx, altoPx } = req.body;
+  const { anchoPx, altoPx, imagenBase64 } = req.body;
+  let { categoriaClave, confianza } = req.body;
+  let origen = 'heuristica';
 
-  let categoria;
+  let categorias;
   try {
-    const resultado = await db.query('SELECT * FROM categorias WHERE clave = $1', [categoriaClave]);
-    categoria = resultado.rows[0];
+    categorias = (await db.query('SELECT * FROM categorias')).rows;
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Error al consultar la categoría.' });
   }
+
+  if (imagenBase64 && iaDisponible()) {
+    try {
+      const ia = await clasificarConIA(imagenBase64, categorias);
+      categoriaClave = ia.categoriaClave;
+      confianza = ia.confianza;
+      origen = 'ia';
+    } catch (err) {
+      console.error('Clasificación con IA fallida, se usa la heurística:', err.message);
+    }
+  }
+
+  const categoria = categorias.find((c) => c.clave === categoriaClave);
   if (!categoria) {
     return res.status(400).json({ error: 'Categoría no reconocida.' });
   }
@@ -89,9 +103,9 @@ router.post('/escaneos', requiereAuth, async (req, res) => {
     await client.query('BEGIN');
     const escaneo = await client.query(
       `INSERT INTO escaneos (usuario_id, categoria_clave, confianza, origen, ancho_px, alto_px, puntos_otorgados)
-       VALUES ($1, $2, $3, 'heuristica', $4, $5, $6)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING id`,
-      [req.usuarioId, categoriaClave, confianza ?? 0, anchoPx ?? null, altoPx ?? null, puntosOtorgados]
+      [req.usuarioId, categoriaClave, confianza ?? 0, origen, anchoPx ?? null, altoPx ?? null, puntosOtorgados]
     );
     await client.query('UPDATE usuarios SET puntos = puntos + $1 WHERE id = $2', [puntosOtorgados, req.usuarioId]);
     const usuarioResultado = await client.query('SELECT puntos FROM usuarios WHERE id = $1', [req.usuarioId]);
@@ -112,11 +126,6 @@ router.post('/escaneos', requiereAuth, async (req, res) => {
     if (client) client.release();
   }
 
-  // TODO(fase IA): aquí es donde, en vez de confiar en la heurística de
-  // color del Worker, se enviará la imagen a un modelo de visión (IA) para
-  // obtener la categoría real con mucha más precisión. El contrato de
-  // salida (categoria, confianza, instrucciones, puntos) se mantiene igual
-  // para no tener que tocar el frontend.
   res.status(201).json({
     id,
     categoria: {
@@ -125,11 +134,10 @@ router.post('/escaneos', requiereAuth, async (req, res) => {
       instrucciones: categoria.instrucciones,
       color_contenedor: categoria.color_contenedor
     },
-    origen: 'heuristica',
+    origen,
+    confianza: confianza ?? 0,
     puntosOtorgados,
-    puntosTotales: usuario.puntos,
-    avisoIA:
-      'Esta clasificación es una heurística simple por color dominante. La clasificación real por IA de visión se conectará en la siguiente fase.'
+    puntosTotales: usuario.puntos
   });
 });
 
