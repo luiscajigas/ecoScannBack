@@ -12,10 +12,7 @@ function extraerImagen(dataUrl) {
   return coincidencia ? { mimeType: coincidencia[1], data: coincidencia[2] } : null;
 }
 
-/**
- * Clasifica un residuo con Gemini. Devuelve { categoriaClave, confianza }
- * o lanza un error si la IA no responde algo utilizable.
- */
+
 async function clasificarConIA(dataUrl, categorias) {
   const imagen = extraerImagen(dataUrl);
   if (!imagen) throw new Error('Imagen inválida.');
