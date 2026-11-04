@@ -1,238 +1,246 @@
 const { test, describe, before, after, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
-const { levantarApi, USUARIO, ESCANEO } = require('./apoyo');
+const jwt = require('jsonwebtoken');
+const { startApi, USER, SCAN, JWT_SECRET } = require('./support');
 
-const IMAGEN = 'data:image/jpeg;base64,AAAA';
+const IMAGE = 'data:image/jpeg;base64,AAAA';
 
-describe('autenticación', () => {
+describe('authentication', () => {
   let api;
-  beforeEach(async () => { api = await levantarApi(); });
-  afterEach(() => api.cerrar());
+  beforeEach(async () => { api = await startApi(); });
+  afterEach(() => api.close());
 
-  const registrar = (datos = USUARIO) => api.pedir('/auth/registro', { metodo: 'POST', cuerpo: datos });
+  const register = (data = USER) => api.request('/auth/register', { method: 'POST', body: data });
 
-  test('el registro devuelve token y nunca el hash', async () => {
-    const { status, json } = await registrar();
+  test('registering returns a token and never the hash', async () => {
+    const { status, json } = await register();
     assert.equal(status, 201);
     assert.ok(json.token);
-    assert.equal(json.usuario.email, USUARIO.email);
+    assert.equal(json.user.email, USER.email);
     assert.equal(JSON.stringify(json).includes('passwordHash'), false);
   });
 
-  test('un correo repetido responde 409 CORREO_EN_USO', async () => {
-    await registrar();
-    const { status, json } = await registrar();
+  test('a repeated email responds 409 EMAIL_IN_USE', async () => {
+    await register();
+    const { status, json } = await register();
     assert.equal(status, 409);
-    assert.equal(json.codigo, 'CORREO_EN_USO');
+    assert.equal(json.code, 'EMAIL_IN_USE');
   });
 
-  for (const [caso, datos] of [
-    ['correo inválido', { ...USUARIO, email: 'no-es-correo' }],
-    ['contraseña corta', { ...USUARIO, password: '123' }],
-    ['nombre vacío', { ...USUARIO, nombre: '' }],
-    ['campo faltante', { email: USUARIO.email, password: USUARIO.password }],
-    ['campo extra', { ...USUARIO, admin: true }],
-    ['contraseña que no es texto', { ...USUARIO, password: 12345678 }]
+  for (const [scenario, data] of [
+    ['an invalid email', { ...USER, email: 'not-an-email' }],
+    ['a short password', { ...USER, password: '123' }],
+    ['an empty name', { ...USER, name: '' }],
+    ['a missing field', { email: USER.email, password: USER.password }],
+    ['an extra field', { ...USER, admin: true }],
+    ['a non-text password', { ...USER, password: 12345678 }]
   ]) {
-    test(`el contrato rechaza el registro con ${caso}`, async () => {
-      const { status, json } = await registrar(datos);
+    test(`the contract rejects registering with ${scenario}`, async () => {
+      const { status, json } = await register(data);
       assert.equal(status, 400);
-      assert.equal(json.codigo, 'DATOS_INVALIDOS');
+      assert.equal(json.code, 'INVALID_DATA');
     });
   }
 
-  test('login correcto y credenciales incorrectas', async () => {
-    await registrar();
-    const bien = await api.pedir('/auth/login', { metodo: 'POST', cuerpo: { email: USUARIO.email, password: USUARIO.password } });
-    assert.equal(bien.status, 200);
-    assert.ok(bien.json.token);
+  test('correct login and wrong credentials', async () => {
+    await register();
+    const good = await api.request('/auth/login', { method: 'POST', body: { email: USER.email, password: USER.password } });
+    assert.equal(good.status, 200);
+    assert.ok(good.json.token);
 
-    const mal = await api.pedir('/auth/login', { metodo: 'POST', cuerpo: { email: USUARIO.email, password: 'otra-clave' } });
-    assert.equal(mal.status, 401);
-    assert.equal(mal.json.codigo, 'CREDENCIALES_INVALIDAS');
+    const bad = await api.request('/auth/login', { method: 'POST', body: { email: USER.email, password: 'wrong-password' } });
+    assert.equal(bad.status, 401);
+    assert.equal(bad.json.code, 'INVALID_CREDENTIALS');
   });
 
-  test('una petición sin cuerpo responde 400', async () => {
-    const { status, json } = await api.pedir('/auth/login', { metodo: 'POST' });
+  test('a request without a body responds 400', async () => {
+    const { status, json } = await api.request('/auth/login', { method: 'POST' });
     assert.equal(status, 400);
-    assert.equal(json.codigo, 'DATOS_INVALIDOS');
+    assert.equal(json.code, 'INVALID_DATA');
   });
 
-  test('un JSON roto responde 400 en el formato del contrato', async () => {
-    const { status, json } = await api.pedir('/auth/login', { metodo: 'POST', cuerpo: '{roto' });
+  test('broken JSON responds 400 in the contract format', async () => {
+    const { status, json } = await api.request('/auth/login', { method: 'POST', body: '{broken' });
     assert.equal(status, 400);
-    assert.equal(json.codigo, 'DATOS_INVALIDOS');
+    assert.equal(json.code, 'INVALID_DATA');
   });
 });
 
-describe('límite de intentos', () => {
-  test('bloquea tras muchos intentos fallidos', async () => {
-    const api = await levantarApi({ intentosAuth: 2 });
+describe('attempt limit', () => {
+  test('blocks after many failed attempts', async () => {
+    const api = await startApi({ maxAuthAttempts: 2 });
     try {
-      const intento = () => api.pedir('/auth/login', { metodo: 'POST', cuerpo: { email: 'a@b.co', password: 'x' } });
-      assert.equal((await intento()).status, 401);
-      assert.equal((await intento()).status, 401);
-      const bloqueado = await intento();
-      assert.equal(bloqueado.status, 429);
-      assert.equal(bloqueado.json.codigo, 'DEMASIADOS_INTENTOS');
+      const attempt = () => api.request('/auth/login', { method: 'POST', body: { email: 'a@b.co', password: 'x' } });
+      assert.equal((await attempt()).status, 401);
+      assert.equal((await attempt()).status, 401);
+      const blocked = await attempt();
+      assert.equal(blocked.status, 429);
+      assert.equal(blocked.json.code, 'TOO_MANY_ATTEMPTS');
     } finally {
-      await api.cerrar();
+      await api.close();
     }
   });
 });
 
-describe('rutas protegidas', () => {
+describe('protected routes', () => {
   let api;
   let token;
   before(async () => {
-    api = await levantarApi();
-    token = (await api.pedir('/auth/registro', { metodo: 'POST', cuerpo: USUARIO })).json.token;
+    api = await startApi();
+    token = (await api.request('/auth/register', { method: 'POST', body: USER })).json.token;
   });
-  after(() => api.cerrar());
+  after(() => api.close());
 
-  for (const [metodo, ruta] of [['GET', '/usuarios/me'], ['GET', '/escaneos'], ['POST', '/escaneos']]) {
-    test(`${metodo} ${ruta} sin token responde 401 NO_AUTENTICADO`, async () => {
-      const { status, json } = await api.pedir(ruta, { metodo, cuerpo: metodo === 'POST' ? ESCANEO : undefined });
+  for (const [method, route] of [['GET', '/users/me'], ['GET', '/scans'], ['POST', '/scans']]) {
+    test(`${method} ${route} without a token responds 401 NOT_AUTHENTICATED`, async () => {
+      const { status, json } = await api.request(route, { method, body: method === 'POST' ? SCAN : undefined });
       assert.equal(status, 401);
-      assert.equal(json.codigo, 'NO_AUTENTICADO');
+      assert.equal(json.code, 'NOT_AUTHENTICATED');
     });
   }
 
-  test('un token falso responde 401 TOKEN_INVALIDO', async () => {
-    const { status, json } = await api.pedir('/escaneos', { token: 'falso' });
+  test('a fake token responds 401 INVALID_TOKEN', async () => {
+    const { status, json } = await api.request('/scans', { token: 'fake' });
     assert.equal(status, 401);
-    assert.equal(json.codigo, 'TOKEN_INVALIDO');
+    assert.equal(json.code, 'INVALID_TOKEN');
   });
 
-  test('el perfil devuelve al usuario sin datos privados', async () => {
-    const { status, json } = await api.pedir('/usuarios/me', { token });
+  test('a signed token from before the rename responds 401 INVALID_TOKEN', async () => {
+    const legacyToken = jwt.sign({ usuarioId: 1 }, JWT_SECRET, { algorithm: 'HS256' });
+    const { status, json } = await api.request('/scans', { token: legacyToken });
+    assert.equal(status, 401);
+    assert.equal(json.code, 'INVALID_TOKEN');
+  });
+
+  test('the profile returns the user without private data', async () => {
+    const { status, json } = await api.request('/users/me', { token });
     assert.equal(status, 200);
-    assert.deepEqual(Object.keys(json).sort(), ['email', 'id', 'nombre', 'puntos']);
+    assert.deepEqual(Object.keys(json).sort(), ['email', 'id', 'name', 'points']);
   });
 
-  test('una categoría fuera del contrato responde 400', async () => {
-    const { status } = await api.pedir('/escaneos', { metodo: 'POST', token, cuerpo: { ...ESCANEO, categoriaClave: 'carton' } });
+  test('a category outside the contract responds 400', async () => {
+    const { status } = await api.request('/scans', { method: 'POST', token, body: { ...SCAN, categoryKey: 'cardboard' } });
     assert.equal(status, 400);
   });
 
-  test('una confianza fuera de rango responde 400', async () => {
-    const { status } = await api.pedir('/escaneos', { metodo: 'POST', token, cuerpo: { ...ESCANEO, confianza: 7 } });
+  test('an out-of-range confidence responds 400', async () => {
+    const { status } = await api.request('/scans', { method: 'POST', token, body: { ...SCAN, confidence: 7 } });
     assert.equal(status, 400);
   });
 });
 
-describe('escaneos', () => {
-  async function conUsuario(opciones) {
-    const api = await levantarApi(opciones);
-    const { json } = await api.pedir('/auth/registro', { metodo: 'POST', cuerpo: USUARIO });
+describe('scans', () => {
+  async function withUser(options) {
+    const api = await startApi(options);
+    const { json } = await api.request('/auth/register', { method: 'POST', body: USER });
     return { api, token: json.token };
   }
 
-  test('sin IA usa la heurística y suma los puntos', async () => {
-    const { api, token } = await conUsuario();
+  test('without AI it uses the heuristic and adds the points', async () => {
+    const { api, token } = await withUser();
     try {
-      const { status, json } = await api.pedir('/escaneos', { metodo: 'POST', token, cuerpo: ESCANEO });
+      const { status, json } = await api.request('/scans', { method: 'POST', token, body: SCAN });
       assert.equal(status, 201);
-      assert.equal(json.origen, 'heuristica');
-      assert.equal(json.categoria.clave, 'plastico');
-      assert.equal(json.puntosTotales, 15);
+      assert.equal(json.source, 'heuristic');
+      assert.equal(json.category.key, 'plastic');
+      assert.equal(json.totalPoints, 15);
 
-      const historial = await api.pedir('/escaneos', { token });
-      assert.equal(historial.status, 200);
-      assert.equal(historial.json.length, 1);
+      const history = await api.request('/scans', { token });
+      assert.equal(history.status, 200);
+      assert.equal(history.json.length, 1);
     } finally {
-      await api.cerrar();
+      await api.close();
     }
   });
 
-  test('con IA, su clasificación reemplaza a la heurística', async () => {
-    const clasificador = { disponible: true, clasificar: async () => ({ categoriaClave: 'metal', confianza: 0.9 }) };
-    const { api, token } = await conUsuario({ clasificador });
+  test('with AI, its classification replaces the heuristic', async () => {
+    const classifier = { isAvailable: true, classify: async () => ({ categoryKey: 'metal', confidence: 0.9 }) };
+    const { api, token } = await withUser({ classifier });
     try {
-      const { json } = await api.pedir('/escaneos', { metodo: 'POST', token, cuerpo: { ...ESCANEO, imagenBase64: IMAGEN } });
-      assert.equal(json.origen, 'ia');
-      assert.equal(json.categoria.clave, 'metal');
-      assert.equal(json.confianza, 0.9);
+      const { json } = await api.request('/scans', { method: 'POST', token, body: { ...SCAN, imageBase64: IMAGE } });
+      assert.equal(json.source, 'ai');
+      assert.equal(json.category.key, 'metal');
+      assert.equal(json.confidence, 0.9);
     } finally {
-      await api.cerrar();
+      await api.close();
     }
   });
 
-  test('si la IA falla, responde igual con la heurística', async () => {
-    const clasificador = { disponible: true, clasificar: async () => { throw new Error('saturada'); } };
-    const { api, token } = await conUsuario({ clasificador });
+  test('if AI fails, it still responds with the heuristic', async () => {
+    const classifier = { isAvailable: true, classify: async () => { throw new Error('overloaded'); } };
+    const { api, token } = await withUser({ classifier });
     try {
-      const { status, json } = await api.pedir('/escaneos', { metodo: 'POST', token, cuerpo: { ...ESCANEO, imagenBase64: IMAGEN } });
+      const { status, json } = await api.request('/scans', { method: 'POST', token, body: { ...SCAN, imageBase64: IMAGE } });
       assert.equal(status, 201);
-      assert.equal(json.origen, 'heuristica');
+      assert.equal(json.source, 'heuristic');
     } finally {
-      await api.cerrar();
+      await api.close();
     }
   });
 });
 
-describe('salud, rutas y CORS', () => {
-  test('salud informa si la base responde o no', async () => {
-    const bien = await levantarApi();
-    const caida = await levantarApi({ comprobarBase: async () => { throw new Error('caída'); } });
+describe('health, routes and CORS', () => {
+  test('health reports whether the database responds', async () => {
+    const healthy = await startApi();
+    const down = await startApi({ checkDatabase: async () => { throw new Error('down'); } });
     try {
-      assert.equal((await bien.pedir('/salud')).json.baseDatos, 'conectada');
-      const respuesta = await caida.pedir('/salud');
-      assert.equal(respuesta.status, 503);
-      assert.equal(respuesta.json.baseDatos, 'desconectada');
+      assert.equal((await healthy.request('/health')).json.database, 'connected');
+      const response = await down.request('/health');
+      assert.equal(response.status, 503);
+      assert.equal(response.json.database, 'disconnected');
     } finally {
-      await bien.cerrar();
-      await caida.cerrar();
+      await healthy.close();
+      await down.close();
     }
   });
 
-  test('categorías es público', async () => {
-    const api = await levantarApi();
+  test('categories are public', async () => {
+    const api = await startApi();
     try {
-      const { status, json } = await api.pedir('/categorias');
+      const { status, json } = await api.request('/categories');
       assert.equal(status, 200);
       assert.equal(json.length, 3);
     } finally {
-      await api.cerrar();
+      await api.close();
     }
   });
 
-  test('una ruta inexistente responde 404 RUTA_NO_ENCONTRADA', async () => {
-    const api = await levantarApi();
+  test('an unknown route responds 404 ROUTE_NOT_FOUND', async () => {
+    const api = await startApi();
     try {
-      const { status, json } = await api.pedir('/no-existe');
+      const { status, json } = await api.request('/does-not-exist');
       assert.equal(status, 404);
-      assert.equal(json.codigo, 'RUTA_NO_ENCONTRADA');
+      assert.equal(json.code, 'ROUTE_NOT_FOUND');
     } finally {
-      await api.cerrar();
+      await api.close();
     }
   });
 
-  for (const [origen, permitido] of [
+  for (const [origin, isAllowed] of [
     ['https://eco-scann-fron.vercel.app', true],
     ['https://eco-scann-fron-n4wlsrp0r-luiscajigas-projects.vercel.app', true],
-    ['https://eco-scann-fron-falso.vercel.app', false],
-    ['https://malo.example.com', false],
+    ['https://eco-scann-fron-fake.vercel.app', false],
+    ['https://bad.example.com', false],
     ['http://localhost:4200', false]
   ]) {
-    test(`CORS en producción ${permitido ? 'permite' : 'rechaza'} ${origen}`, async () => {
-      const api = await levantarApi();
+    test(`CORS in production ${isAllowed ? 'allows' : 'rejects'} ${origin}`, async () => {
+      const api = await startApi();
       try {
-        const { encabezados } = await api.pedir('/salud', { encabezados: { Origin: origen } });
-        assert.equal(encabezados.get('access-control-allow-origin'), permitido ? origen : null);
+        const { headers } = await api.request('/health', { headers: { Origin: origin } });
+        assert.equal(headers.get('access-control-allow-origin'), isAllowed ? origin : null);
       } finally {
-        await api.cerrar();
+        await api.close();
       }
     });
   }
 
-  test('CORS permite localhost fuera de producción', async () => {
-    const api = await levantarApi({ produccion: false });
+  test('CORS allows localhost outside production', async () => {
+    const api = await startApi({ isProduction: false });
     try {
-      const { encabezados } = await api.pedir('/salud', { encabezados: { Origin: 'http://localhost:4200' } });
-      assert.equal(encabezados.get('access-control-allow-origin'), 'http://localhost:4200');
+      const { headers } = await api.request('/health', { headers: { Origin: 'http://localhost:4200' } });
+      assert.equal(headers.get('access-control-allow-origin'), 'http://localhost:4200');
     } finally {
-      await api.cerrar();
+      await api.close();
     }
   });
 });
