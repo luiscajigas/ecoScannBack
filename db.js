@@ -6,7 +6,9 @@ if (!process.env.DATABASE_URL) {
 
 const db = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.PG_SSL === 'true' ? { rejectUnauthorized: true } : false
+  ssl: process.env.PG_SSL === 'true' ? { rejectUnauthorized: true } : false,
+  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis: 30000
 });
 
 const categorias = [
