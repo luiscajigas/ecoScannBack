@@ -35,8 +35,8 @@ router.post('/registro', async (req, res) => {
 });
 
 router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) {
+  const { email, password } = req.body ?? {};
+  if (![email, password].every((dato) => typeof dato === 'string' && dato)) {
     return res.status(400).json({ error: 'email y password son obligatorios.' });
   }
 
