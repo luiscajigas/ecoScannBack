@@ -9,6 +9,7 @@ const { db, inicializarBaseDatos } = require('./db');
 const app = express();
 const PORT = process.env.PORT || 3002;
 const ORIGEN_PRODUCCION = 'https://eco-scann-fron.vercel.app';
+const PREVIEWS_VERCEL = /^https:\/\/eco-scann-fron-[a-z0-9-]+-luiscajigas-projects\.vercel\.app$/;
 const origenesPermitidos = [
   ORIGEN_PRODUCCION,
   ...(process.env.CORS_ORIGIN || '')
@@ -22,6 +23,7 @@ app.use(cors({
     if (
       !origen ||
       origenesPermitidos.includes(origen) ||
+      PREVIEWS_VERCEL.test(origen) ||
       (process.env.NODE_ENV !== 'production' && /^http:\/\/localhost:\d+$/.test(origen))
     ) {
       return callback(null, true);
