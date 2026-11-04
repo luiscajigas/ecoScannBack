@@ -11,6 +11,11 @@ const db = new Pool({
   idleTimeoutMillis: 30000
 });
 
+// Sin este listener, una conexión inactiva cerrada por la base tumba el proceso.
+db.on('error', (err) => {
+  console.error('Error en una conexión inactiva de PostgreSQL:', err.message);
+});
+
 const categorias = [
   {
     clave: 'organico',
