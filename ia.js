@@ -94,10 +94,14 @@ async function consultarModelo(modelo, cuerpo, claves) {
 
   const json = await respuesta.json();
   const texto = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+  return interpretarResultado(texto, claves);
+}
+
+function interpretarResultado(texto, claves) {
   const resultado = JSON.parse(texto);
 
   if (!claves.includes(resultado.categoria)) {
-    throw new Error('Gemini devolvió una categoría desconocida.');
+    throw new Error('La IA devolvió una categoría desconocida.');
   }
 
   const confianza = Math.min(1, Math.max(0, Number(resultado.confianza) || 0));
