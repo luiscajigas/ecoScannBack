@@ -12,7 +12,7 @@ const TIMEOUT_CLAUDE_MS = 15000;
 const DATA_URL = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/;
 
 function iaDisponible() {
-  return Boolean(process.env.GEMINI_API_KEY);
+  return Boolean(process.env.GEMINI_API_KEY || process.env.ANTHROPIC_API_KEY);
 }
 
 function extraerImagen(dataUrl) {
@@ -60,15 +60,29 @@ async function clasificarConIA(dataUrl, categorias) {
   };
 
   let ultimoError;
-  for (const modelo of MODELOS) {
-    try {
-      return await consultarModelo(modelo, cuerpo, claves);
-    } catch (err) {
-      ultimoError = err;
-      console.warn(`Gemini ${modelo} falló: ${err.message}`);
-      if (err.definitivo) break;
+  if (process.env.GEMINI_API_KEY) {
+    for (const modelo of MODELOS) {
+      try {
+        return await consultarModelo(modelo, cuerpo, claves);
+      } catch (err) {
+        ultimoError = err;
+        console.warn(`Gemini ${modelo} falló: ${err.message}`);
+        if (err.definitivo) break;
+      }
     }
   }
+
+  if (process.env.ANTHROPIC_API_KEY) {
+    try {
+      const resultado = await consultarClaude(imagen, instruccion, claves);
+      console.log(`Clasificación hecha con Claude (${MODELO_CLAUDE}).`);
+      return resultado;
+    } catch (err) {
+      ultimoError = err;
+      console.warn(`Claude falló: ${err.message}`);
+    }
+  }
+
   throw ultimoError;
 }
 
