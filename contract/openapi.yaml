@@ -1,0 +1,393 @@
+openapi: 3.0.3
+info:
+  title: EcoScan API
+  version: 2.0.0
+  description: >
+    EcoScan API contract and single source of truth. The backend validates
+    requests against this file, and the TypeScript types of both the backend
+    and the frontend are generated from it. Every change starts here.
+servers:
+  - url: /api
+security: []
+
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Status of the API and of the database connection.
+      responses:
+        '200':
+          description: The API and the database are working.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+        '503':
+          description: The API is working, but the database is not responding.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+
+  /auth/register:
+    post:
+      operationId: registerUser
+      summary: Creates an account and signs in.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Account created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /auth/login:
+    post:
+      operationId: logIn
+      summary: Signs in with email and password.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Signed in.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /categories:
+    get:
+      operationId: listCategories
+      summary: Public catalog of recycling categories.
+      responses:
+        '200':
+          description: Available categories.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /users/me:
+    get:
+      operationId: getProfile
+      summary: Profile of the authenticated user.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User profile.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /scans:
+    get:
+      operationId: listScans
+      summary: The user's latest 50 scans, newest first.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User's scan history.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Scan'
+        '401':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: createScan
+      summary: Classifies an item with AI, or with the heuristic if AI fails, and awards points.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScanRequest'
+      responses:
+        '201':
+          description: Scan saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanResult'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '413':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    Error:
+      description: Error with a stable code for the client.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+
+  schemas:
+    ErrorCode:
+      type: string
+      description: Stable identifier; the frontend translates from it.
+      enum:
+        - INVALID_DATA
+        - NOT_AUTHENTICATED
+        - INVALID_TOKEN
+        - INVALID_CREDENTIALS
+        - EMAIL_IN_USE
+        - UNKNOWN_CATEGORY
+        - USER_NOT_FOUND
+        - ROUTE_NOT_FOUND
+        - IMAGE_TOO_LARGE
+        - TOO_MANY_ATTEMPTS
+        - INTERNAL_ERROR
+
+    ApiError:
+      type: object
+      additionalProperties: false
+      required: [error, code]
+      properties:
+        error:
+          type: string
+          description: Developer-facing message; users see the frontend's translation of code.
+        code:
+          $ref: '#/components/schemas/ErrorCode'
+
+    CategoryKey:
+      type: string
+      enum: [organic, paper_cardboard, plastic, glass, metal, non_recyclable]
+
+    BinColor:
+      type: string
+      enum: [green, blue, white, black]
+
+    ClassificationSource:
+      type: string
+      enum: [ai, heuristic]
+
+    Health:
+      type: object
+      additionalProperties: false
+      required: [status, service, database]
+      properties:
+        status:
+          type: string
+          enum: [ok, error]
+        service:
+          type: string
+        database:
+          type: string
+          enum: [connected, disconnected]
+
+    RegisterRequest:
+      type: object
+      additionalProperties: false
+      required: [name, email, password]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        password:
+          type: string
+          minLength: 8
+          maxLength: 72
+          description: bcrypt only takes the first 72 bytes into account.
+
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          minLength: 1
+          maxLength: 254
+        password:
+          type: string
+          minLength: 1
+          maxLength: 72
+
+    User:
+      type: object
+      additionalProperties: false
+      required: [id, name, email, points]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        points:
+          type: integer
+
+    AuthResponse:
+      type: object
+      additionalProperties: false
+      required: [token, user]
+      properties:
+        token:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+
+    Category:
+      type: object
+      additionalProperties: false
+      required: [key, name, instructions, binColor, points]
+      properties:
+        key:
+          $ref: '#/components/schemas/CategoryKey'
+        name:
+          type: string
+        instructions:
+          type: string
+        binColor:
+          $ref: '#/components/schemas/BinColor'
+        points:
+          type: integer
+
+    Scan:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - categoryKey
+        - categoryName
+        - instructions
+        - binColor
+        - confidence
+        - source
+        - pointsAwarded
+        - createdAt
+      properties:
+        id:
+          type: integer
+        categoryKey:
+          $ref: '#/components/schemas/CategoryKey'
+        categoryName:
+          type: string
+        instructions:
+          type: string
+        binColor:
+          $ref: '#/components/schemas/BinColor'
+        confidence:
+          type: number
+        source:
+          $ref: '#/components/schemas/ClassificationSource'
+        pointsAwarded:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    ScanRequest:
+      type: object
+      additionalProperties: false
+      required: [categoryKey, confidence, widthPx, heightPx]
+      description: >
+        categoryKey and confidence are the heuristic classification computed by
+        the Web Worker; the backend only uses it when AI is unavailable.
+      properties:
+        categoryKey:
+          $ref: '#/components/schemas/CategoryKey'
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        widthPx:
+          type: integer
+          minimum: 1
+        heightPx:
+          type: integer
+          minimum: 1
+        imageBase64:
+          type: string
+          description: Compressed image as a data URL (JPEG, PNG or WebP).
+
+    ScanResult:
+      type: object
+      additionalProperties: false
+      required: [id, category, source, confidence, pointsAwarded, totalPoints]
+      properties:
+        id:
+          type: integer
+        category:
+          type: object
+          additionalProperties: false
+          required: [key, name, instructions, binColor]
+          properties:
+            key:
+              $ref: '#/components/schemas/CategoryKey'
+            name:
+              type: string
+            instructions:
+              type: string
+            binColor:
+              $ref: '#/components/schemas/BinColor'
+        source:
+          $ref: '#/components/schemas/ClassificationSource'
+        confidence:
+          type: number
+        pointsAwarded:
+          type: integer
+        totalPoints:
+          type: integer
