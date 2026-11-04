@@ -1,75 +1,71 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-
-const authRoutes = require('./routes/auth');
-const escaneosRoutes = require('./routes/escaneos');
-const { db, inicializarBaseDatos } = require('./db');
-
-const app = express();
-const PORT = process.env.PORT || 3002;
-const ORIGEN_PRODUCCION = 'https://eco-scann-fron.vercel.app';
-const PREVIEWS_VERCEL = /^https:\/\/eco-scann-fron-[a-z0-9-]+-luiscajigas-projects\.vercel\.app$/;
-const origenesPermitidos = [
-  ORIGEN_PRODUCCION,
-  ...(process.env.CORS_ORIGIN || '')
-    .split(',')
-    .map((origen) => origen.trim().replace(/\/+$/, ''))
-    .filter(Boolean)
-];
-
-app.use(cors({
-  origin(origen, callback) {
-    if (
-      !origen ||
-      origenesPermitidos.includes(origen) ||
-      PREVIEWS_VERCEL.test(origen) ||
-      (process.env.NODE_ENV !== 'production' && /^http:\/\/localhost:\d+$/.test(origen))
-    ) {
-      return callback(null, true);
-    }
-    console.warn(`Origen rechazado por CORS: ${origen}`);
-    return callback(null, false);
-  }
-}));
-app.use(express.json({ limit: '5mb' })); // la imagen comprimida viaja como base64
-
-app.get('/api/salud', async (req, res) => {
-  try {
-    await db.query('SELECT 1');
-    res.json({ estado: 'ok', servicio: 'ecoscan-backend', baseDatos: 'conectada' });
-  } catch (err) {
-    console.error(err);
-    res.status(503).json({ estado: 'error', servicio: 'ecoscan-backend' });
-  }
-});
-
-app.use('/api/auth', authRoutes);
-app.use('/api', escaneosRoutes);
-
-app.use((req, res) => res.status(404).json({ error: 'Ruta no encontrada.' }));
-
-app.use((err, req, res, next) => {
-  if (res.headersSent) return next(err);
-  console.error(err);
-  const mensajes = { 400: 'Solicitud inválida.', 413: 'La imagen es demasiado grande.' };
-  const estado = mensajes[err.status] ? err.status : 500;
-  res.status(estado).json({ error: mensajes[estado] || 'Error interno del servidor.' });
-});
+// @ts-check
+const { cargarConfig } = require('./config');
+const { crearPool, inicializarBaseDatos } = require('./db');
+const { crearApp } = require('./app');
+const { crearClasificador } = require('./ia/clasificador');
+const { crearProveedorGemini } = require('./ia/gemini');
+const { crearProveedorClaude } = require('./ia/claude');
+const { crearRepositorioCategorias } = require('./repositorios/categorias');
+const { crearRepositorioEscaneos } = require('./repositorios/escaneos');
+const { crearRepositorioUsuarios } = require('./repositorios/usuarios');
+const { crearServicioAuth } = require('./servicios/auth');
+const { crearServicioEscaneos } = require('./servicios/escaneos');
 
 const REINTENTO_BASE_MS = 15000;
+const LIMITE_APAGADO_MS = 10000;
+
+const config = cargarConfig();
+const db = crearPool(config);
+
+// Raíz de composición: el único lugar donde se conectan las piezas reales.
+const { gemini, anthropic } = config;
+const clasificador = crearClasificador([
+  ...(gemini.apiKey ? [crearProveedorGemini({ apiKey: gemini.apiKey, modelo: gemini.modelo })] : []),
+  ...(anthropic.apiKey ? [crearProveedorClaude({ apiKey: anthropic.apiKey, modelo: anthropic.modelo })] : [])
+]);
+
+const categorias = crearRepositorioCategorias(db);
+const escaneos = crearRepositorioEscaneos(db);
+const usuarios = crearRepositorioUsuarios(db);
+
+const app = crearApp({
+  origenes: config.origenes,
+  produccion: config.produccion,
+  comprobarBase: () => db.query('SELECT 1'),
+  servicioAuth: crearServicioAuth({ usuarios, jwtSecret: config.jwtSecret }),
+  servicioEscaneos: crearServicioEscaneos({ categorias, escaneos, clasificador }),
+  categorias,
+  escaneos,
+  usuarios
+});
+
+/** @type {NodeJS.Timeout | undefined} */
+let temporizadorReintento;
 
 function prepararBaseDatos() {
-  inicializarBaseDatos()
+  inicializarBaseDatos(db)
     .then(() => console.log('Base de datos lista.'))
     .catch((err) => {
       console.error('No se pudo preparar la base de datos:', err.message);
-      setTimeout(prepararBaseDatos, REINTENTO_BASE_MS);
+      temporizadorReintento = setTimeout(prepararBaseDatos, REINTENTO_BASE_MS);
     });
 }
 
-app.listen(PORT, (err) => {
+const servidor = app.listen(config.puerto, (err) => {
   if (err) throw err;
-  console.log(`Backend de EcoScan escuchando en el puerto ${PORT}`);
+  console.log(`Backend de EcoScan escuchando en el puerto ${config.puerto}`);
   prepararBaseDatos();
 });
+
+/** Render envía SIGTERM en cada despliegue: se terminan las peticiones en curso y se cierra la base. */
+function apagar() {
+  console.log('Apagando el servidor...');
+  clearTimeout(temporizadorReintento);
+  setTimeout(() => process.exit(1), LIMITE_APAGADO_MS).unref();
+  servidor.close(() => {
+    db.end().finally(() => process.exit(0));
+  });
+}
+
+process.on('SIGTERM', apagar);
+process.on('SIGINT', apagar);

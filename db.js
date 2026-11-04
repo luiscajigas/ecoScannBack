@@ -1,20 +1,50 @@
+// @ts-check
 const { Pool } = require('pg');
 
-if (!process.env.DATABASE_URL) {
-  throw new Error('Falta la variable de entorno DATABASE_URL.');
+/**
+ * @param {{ databaseUrl: string, pgSsl: boolean }} opciones
+ * @returns {Pool}
+ */
+function crearPool({ databaseUrl, pgSsl }) {
+  const db = new Pool({
+    connectionString: databaseUrl,
+    ssl: pgSsl ? { rejectUnauthorized: true } : false,
+    connectionTimeoutMillis: 10000,
+    idleTimeoutMillis: 30000
+  });
+
+  // Sin este listener, una conexión inactiva cerrada por la base tumba el proceso.
+  db.on('error', (err) => {
+    console.error('Error en una conexión inactiva de PostgreSQL:', err.message);
+  });
+
+  return db;
 }
 
-const db = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.PG_SSL === 'true' ? { rejectUnauthorized: true } : false,
-  connectionTimeoutMillis: 10000,
-  idleTimeoutMillis: 30000
-});
-
-// Sin este listener, una conexión inactiva cerrada por la base tumba el proceso.
-db.on('error', (err) => {
-  console.error('Error en una conexión inactiva de PostgreSQL:', err.message);
-});
+/**
+ * Ejecuta `trabajo` dentro de una transacción: confirma si termina bien y
+ * revierte si lanza un error.
+ * @template T
+ * @param {Pool} db
+ * @param {(cliente: import('pg').PoolClient) => Promise<T>} trabajo
+ * @returns {Promise<T>}
+ */
+async function enTransaccion(db, trabajo) {
+  const cliente = await db.connect();
+  try {
+    await cliente.query('BEGIN');
+    const resultado = await trabajo(cliente);
+    await cliente.query('COMMIT');
+    return resultado;
+  } catch (err) {
+    await cliente.query('ROLLBACK').catch((errorRollback) => {
+      console.error('No se pudo revertir la transacción:', errorRollback);
+    });
+    throw err;
+  } finally {
+    cliente.release();
+  }
+}
 
 const categorias = [
   {
@@ -61,7 +91,11 @@ const categorias = [
   }
 ];
 
-async function inicializarBaseDatos() {
+/**
+ * Crea las tablas y carga el catálogo; se puede ejecutar varias veces.
+ * @param {Pool} db
+ */
+async function inicializarBaseDatos(db) {
   await db.query(`
     CREATE TABLE IF NOT EXISTS usuarios (
       id SERIAL PRIMARY KEY,
@@ -103,4 +137,4 @@ async function inicializarBaseDatos() {
   }
 }
 
-module.exports = { db, inicializarBaseDatos };
+module.exports = { crearPool, enTransaccion, inicializarBaseDatos };
