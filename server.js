@@ -49,10 +49,15 @@ app.use('/api', escaneosRoutes);
 
 app.use((req, res) => res.status(404).json({ error: 'Ruta no encontrada.' }));
 
+const REINTENTO_BASE_MS = 15000;
+
 function prepararBaseDatos() {
   inicializarBaseDatos()
     .then(() => console.log('Base de datos lista.'))
-    .catch((err) => console.error('No se pudo preparar la base de datos:', err.message));
+    .catch((err) => {
+      console.error('No se pudo preparar la base de datos:', err.message);
+      setTimeout(prepararBaseDatos, REINTENTO_BASE_MS);
+    });
 }
 
 app.listen(PORT, (err) => {
