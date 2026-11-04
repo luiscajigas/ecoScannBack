@@ -1,71 +1,71 @@
 // @ts-check
-const { cargarConfig } = require('./config');
-const { crearPool, inicializarBaseDatos } = require('./db');
-const { crearApp } = require('./app');
-const { crearClasificador } = require('./ia/clasificador');
-const { crearProveedorGemini } = require('./ia/gemini');
-const { crearProveedorClaude } = require('./ia/claude');
-const { crearRepositorioCategorias } = require('./repositorios/categorias');
-const { crearRepositorioEscaneos } = require('./repositorios/escaneos');
-const { crearRepositorioUsuarios } = require('./repositorios/usuarios');
-const { crearServicioAuth } = require('./servicios/auth');
-const { crearServicioEscaneos } = require('./servicios/escaneos');
+const { loadConfig } = require('./config');
+const { createPool, initializeDatabase } = require('./db');
+const { createApp } = require('./app');
+const { createClassifier } = require('./ai/classifier');
+const { createGeminiProvider } = require('./ai/gemini');
+const { createClaudeProvider } = require('./ai/claude');
+const { createCategoryRepository } = require('./repositories/categories');
+const { createScanRepository } = require('./repositories/scans');
+const { createUserRepository } = require('./repositories/users');
+const { createAuthService } = require('./services/auth');
+const { createScanService } = require('./services/scans');
 
-const REINTENTO_BASE_MS = 15000;
-const LIMITE_APAGADO_MS = 10000;
+const DATABASE_RETRY_MS = 15000;
+const SHUTDOWN_LIMIT_MS = 10000;
 
-const config = cargarConfig();
-const db = crearPool(config);
+const config = loadConfig();
+const db = createPool(config);
 
-// Raíz de composición: el único lugar donde se conectan las piezas reales.
+// Composition root: the only place where the real pieces are wired together.
 const { gemini, anthropic } = config;
-const clasificador = crearClasificador([
-  ...(gemini.apiKey ? [crearProveedorGemini({ apiKey: gemini.apiKey, modelo: gemini.modelo })] : []),
-  ...(anthropic.apiKey ? [crearProveedorClaude({ apiKey: anthropic.apiKey, modelo: anthropic.modelo })] : [])
+const classifier = createClassifier([
+  ...(gemini.apiKey ? [createGeminiProvider({ apiKey: gemini.apiKey, model: gemini.model })] : []),
+  ...(anthropic.apiKey ? [createClaudeProvider({ apiKey: anthropic.apiKey, model: anthropic.model })] : [])
 ]);
 
-const categorias = crearRepositorioCategorias(db);
-const escaneos = crearRepositorioEscaneos(db);
-const usuarios = crearRepositorioUsuarios(db);
+const categories = createCategoryRepository(db);
+const scans = createScanRepository(db);
+const users = createUserRepository(db);
 
-const app = crearApp({
-  origenes: config.origenes,
-  produccion: config.produccion,
-  comprobarBase: () => db.query('SELECT 1'),
-  servicioAuth: crearServicioAuth({ usuarios, jwtSecret: config.jwtSecret }),
-  servicioEscaneos: crearServicioEscaneos({ categorias, escaneos, clasificador }),
-  categorias,
-  escaneos,
-  usuarios
+const app = createApp({
+  origins: config.origins,
+  isProduction: config.isProduction,
+  checkDatabase: () => db.query('SELECT 1'),
+  authService: createAuthService({ users, jwtSecret: config.jwtSecret }),
+  scanService: createScanService({ categories, scans, classifier }),
+  categories,
+  scans,
+  users
 });
 
 /** @type {NodeJS.Timeout | undefined} */
-let temporizadorReintento;
+let retryTimer;
 
-function prepararBaseDatos() {
-  inicializarBaseDatos(db)
-    .then(() => console.log('Base de datos lista.'))
+function prepareDatabase() {
+  initializeDatabase(db)
+    .then(() => console.log('Database ready.'))
     .catch((err) => {
-      console.error('No se pudo preparar la base de datos:', err.message);
-      temporizadorReintento = setTimeout(prepararBaseDatos, REINTENTO_BASE_MS);
+      console.error('Could not prepare the database:', err.message);
+      retryTimer = setTimeout(prepareDatabase, DATABASE_RETRY_MS);
     });
 }
 
-const servidor = app.listen(config.puerto, (err) => {
+const server = app.listen(config.port, (err) => {
   if (err) throw err;
-  console.log(`Backend de EcoScan escuchando en el puerto ${config.puerto}`);
-  prepararBaseDatos();
+  console.log(`EcoScan backend listening on port ${config.port}`);
+  prepareDatabase();
 });
 
-/** Render envía SIGTERM en cada despliegue: se terminan las peticiones en curso y se cierra la base. */
-function apagar() {
-  console.log('Apagando el servidor...');
-  clearTimeout(temporizadorReintento);
-  setTimeout(() => process.exit(1), LIMITE_APAGADO_MS).unref();
-  servidor.close(() => {
+/** Render sends SIGTERM on every deploy: finish in-flight requests and close the database. */
+function shutDown() {
+  console.log('Shutting down the server...');
+  clearTimeout(retryTimer);
+  setTimeout(() => process.exit(1), SHUTDOWN_LIMIT_MS).unref();
+  server.close(() => {
     db.end().finally(() => process.exit(0));
   });
 }
 
-process.on('SIGTERM', apagar);
-process.on('SIGINT', apagar);
+process.on('SIGTERM', shutDown);
+process.on('SIGINT', shutDown);
