@@ -1,25 +1,25 @@
 // @ts-check
 
-const PREVIEWS_VERCEL = /^https:\/\/eco-scann-fron-[a-z0-9-]+-luiscajigas-projects\.vercel\.app$/;
+const VERCEL_PREVIEWS = /^https:\/\/eco-scann-fron-[a-z0-9-]+-luiscajigas-projects\.vercel\.app$/;
 const LOCALHOST = /^http:\/\/localhost:\d+$/;
 
 /**
- * @param {{ origenes: string[], produccion: boolean }} opciones
+ * @param {{ origins: string[], isProduction: boolean }} options
  * @returns {import('cors').CorsOptions}
  */
-function crearOpcionesCors({ origenes, produccion }) {
+function createCorsOptions({ origins, isProduction }) {
   return {
-    origin(origen, callback) {
-      const permitido =
-        !origen ||
-        origenes.includes(origen) ||
-        PREVIEWS_VERCEL.test(origen) ||
-        (!produccion && LOCALHOST.test(origen));
+    origin(origin, callback) {
+      const isAllowed =
+        !origin ||
+        origins.includes(origin) ||
+        VERCEL_PREVIEWS.test(origin) ||
+        (!isProduction && LOCALHOST.test(origin));
 
-      if (!permitido) console.warn(`Origen rechazado por CORS: ${origen}`);
-      callback(null, permitido);
+      if (!isAllowed) console.warn(`Origin rejected by CORS: ${origin}`);
+      callback(null, isAllowed);
     }
   };
 }
 
-module.exports = { crearOpcionesCors };
+module.exports = { createCorsOptions };
