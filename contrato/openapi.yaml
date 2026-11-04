@@ -1,0 +1,393 @@
+openapi: 3.0.3
+info:
+  title: EcoScan API
+  version: 1.0.0
+  description: >
+    Contrato de la API de EcoScan y única fuente de verdad. El backend valida
+    las peticiones contra este archivo y los tipos de TypeScript del backend y
+    del frontend se generan a partir de él. Los cambios empiezan aquí.
+servers:
+  - url: /api
+security: []
+
+paths:
+  /salud:
+    get:
+      operationId: consultarSalud
+      summary: Estado de la API y de la conexión a la base de datos.
+      responses:
+        '200':
+          description: La API y la base de datos funcionan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Salud'
+        '503':
+          description: La API funciona, pero la base de datos no responde.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Salud'
+
+  /auth/registro:
+    post:
+      operationId: registrarUsuario
+      summary: Crea una cuenta e inicia sesión.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SolicitudRegistro'
+      responses:
+        '201':
+          description: Cuenta creada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaAuth'
+        '400':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /auth/login:
+    post:
+      operationId: iniciarSesion
+      summary: Inicia sesión con correo y contraseña.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SolicitudLogin'
+      responses:
+        '200':
+          description: Sesión iniciada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaAuth'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /categorias:
+    get:
+      operationId: listarCategorias
+      summary: Catálogo público de categorías de reciclaje.
+      responses:
+        '200':
+          description: Categorías disponibles.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Categoria'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /usuarios/me:
+    get:
+      operationId: consultarPerfil
+      summary: Perfil del usuario autenticado.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Perfil del usuario.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Usuario'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /escaneos:
+    get:
+      operationId: listarEscaneos
+      summary: Últimos 50 escaneos del usuario, del más reciente al más antiguo.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Historial del usuario.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Escaneo'
+        '401':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: registrarEscaneo
+      summary: Clasifica un residuo con IA, o con la heurística si la IA falla, y suma puntos.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SolicitudEscaneo'
+      responses:
+        '201':
+          description: Escaneo registrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultadoEscaneo'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '413':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    Error:
+      description: Error con un código estable para el cliente.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorApi'
+
+  schemas:
+    CodigoError:
+      type: string
+      description: Identificador estable; el frontend traduce a partir de él.
+      enum:
+        - DATOS_INVALIDOS
+        - NO_AUTENTICADO
+        - TOKEN_INVALIDO
+        - CREDENCIALES_INVALIDAS
+        - CORREO_EN_USO
+        - CATEGORIA_DESCONOCIDA
+        - USUARIO_NO_ENCONTRADO
+        - RUTA_NO_ENCONTRADA
+        - IMAGEN_DEMASIADO_GRANDE
+        - DEMASIADOS_INTENTOS
+        - ERROR_INTERNO
+
+    ErrorApi:
+      type: object
+      additionalProperties: false
+      required: [error, codigo]
+      properties:
+        error:
+          type: string
+          description: Mensaje en español pensado para mostrar o registrar.
+        codigo:
+          $ref: '#/components/schemas/CodigoError'
+
+    CategoriaClave:
+      type: string
+      enum: [organico, papel_carton, plastico, vidrio, metal, no_reciclable]
+
+    ColorContenedor:
+      type: string
+      enum: [verde, azul, blanco, negro]
+
+    OrigenClasificacion:
+      type: string
+      enum: [ia, heuristica]
+
+    Salud:
+      type: object
+      additionalProperties: false
+      required: [estado, servicio, baseDatos]
+      properties:
+        estado:
+          type: string
+          enum: [ok, error]
+        servicio:
+          type: string
+        baseDatos:
+          type: string
+          enum: [conectada, desconectada]
+
+    SolicitudRegistro:
+      type: object
+      additionalProperties: false
+      required: [nombre, email, password]
+      properties:
+        nombre:
+          type: string
+          minLength: 1
+          maxLength: 100
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        password:
+          type: string
+          minLength: 8
+          maxLength: 72
+          description: bcrypt solo tiene en cuenta los primeros 72 bytes.
+
+    SolicitudLogin:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          minLength: 1
+          maxLength: 254
+        password:
+          type: string
+          minLength: 1
+          maxLength: 72
+
+    Usuario:
+      type: object
+      additionalProperties: false
+      required: [id, nombre, email, puntos]
+      properties:
+        id:
+          type: integer
+        nombre:
+          type: string
+        email:
+          type: string
+        puntos:
+          type: integer
+
+    RespuestaAuth:
+      type: object
+      additionalProperties: false
+      required: [token, usuario]
+      properties:
+        token:
+          type: string
+        usuario:
+          $ref: '#/components/schemas/Usuario'
+
+    Categoria:
+      type: object
+      additionalProperties: false
+      required: [clave, nombre, instrucciones, color_contenedor, puntos]
+      properties:
+        clave:
+          $ref: '#/components/schemas/CategoriaClave'
+        nombre:
+          type: string
+        instrucciones:
+          type: string
+        color_contenedor:
+          $ref: '#/components/schemas/ColorContenedor'
+        puntos:
+          type: integer
+
+    Escaneo:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - categoria_clave
+        - categoria_nombre
+        - instrucciones
+        - color_contenedor
+        - confianza
+        - origen
+        - puntos_otorgados
+        - creado_en
+      properties:
+        id:
+          type: integer
+        categoria_clave:
+          $ref: '#/components/schemas/CategoriaClave'
+        categoria_nombre:
+          type: string
+        instrucciones:
+          type: string
+        color_contenedor:
+          $ref: '#/components/schemas/ColorContenedor'
+        confianza:
+          type: number
+        origen:
+          $ref: '#/components/schemas/OrigenClasificacion'
+        puntos_otorgados:
+          type: integer
+        creado_en:
+          type: string
+          format: date-time
+
+    SolicitudEscaneo:
+      type: object
+      additionalProperties: false
+      required: [categoriaClave, confianza, anchoPx, altoPx]
+      description: >
+        categoriaClave y confianza son la clasificación heurística calculada
+        por el Web Worker; el backend solo la usa si la IA no está disponible.
+      properties:
+        categoriaClave:
+          $ref: '#/components/schemas/CategoriaClave'
+        confianza:
+          type: number
+          minimum: 0
+          maximum: 1
+        anchoPx:
+          type: integer
+          minimum: 1
+        altoPx:
+          type: integer
+          minimum: 1
+        imagenBase64:
+          type: string
+          description: Imagen comprimida como data URL (JPEG, PNG o WebP).
+
+    ResultadoEscaneo:
+      type: object
+      additionalProperties: false
+      required: [id, categoria, origen, confianza, puntosOtorgados, puntosTotales]
+      properties:
+        id:
+          type: integer
+        categoria:
+          type: object
+          additionalProperties: false
+          required: [clave, nombre, instrucciones, color_contenedor]
+          properties:
+            clave:
+              $ref: '#/components/schemas/CategoriaClave'
+            nombre:
+              type: string
+            instrucciones:
+              type: string
+            color_contenedor:
+              $ref: '#/components/schemas/ColorContenedor'
+        origen:
+          $ref: '#/components/schemas/OrigenClasificacion'
+        confianza:
+          type: number
+        puntosOtorgados:
+          type: integer
+        puntosTotales:
+          type: integer
