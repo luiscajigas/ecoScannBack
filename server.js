@@ -13,7 +13,7 @@ const origenesPermitidos = [
   ORIGEN_PRODUCCION,
   ...(process.env.CORS_ORIGIN || '')
     .split(',')
-    .map((origen) => origen.trim())
+    .map((origen) => origen.trim().replace(/\/+$/, ''))
     .filter(Boolean)
 ];
 
