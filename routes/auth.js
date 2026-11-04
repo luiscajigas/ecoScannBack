@@ -11,8 +11,8 @@ function firmarToken(usuarioId) {
 }
 
 router.post('/registro', async (req, res) => {
-  const { nombre, email, password } = req.body;
-  if (!nombre || !email || !password) {
+  const { nombre, email, password } = req.body ?? {};
+  if (![nombre, email, password].every((dato) => typeof dato === 'string' && dato)) {
     return res.status(400).json({ error: 'nombre, email y password son obligatorios.' });
   }
 
