@@ -1,10 +1,14 @@
 // Si un modelo está saturado se prueba el siguiente; el lite suele tener menos demanda.
+const Anthropic = require('@anthropic-ai/sdk').default;
+
 const MODELOS = [...new Set([
   process.env.GEMINI_MODEL || 'gemini-3.8-flash',
   'gemini-flash-latest',
   'gemini-flash-lite-latest'
 ])];
 const TIMEOUT_MS = 15000;
+const MODELO_CLAUDE = process.env.ANTHROPIC_MODEL || 'claude-haiku-5-5';
+const TIMEOUT_CLAUDE_MS = 15000;
 const DATA_URL = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/;
 
 function iaDisponible() {
@@ -94,6 +98,45 @@ async function consultarModelo(modelo, cuerpo, claves) {
 
   const json = await respuesta.json();
   const texto = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+  return interpretarResultado(texto, claves);
+}
+
+async function consultarClaude(imagen, instruccion, claves) {
+  const cliente = new Anthropic({ timeout: TIMEOUT_CLAUDE_MS, maxRetries: 1 });
+  const respuesta = await cliente.messages.create({
+    model: MODELO_CLAUDE,
+    max_tokens: 1024,
+    output_config: {
+      effort: 'low',
+      format: {
+        type: 'json_schema',
+        schema: {
+          type: 'object',
+          properties: {
+            categoria: { type: 'string', enum: claves },
+            confianza: { type: 'number' }
+          },
+          required: ['categoria', 'confianza'],
+          additionalProperties: false
+        }
+      }
+    },
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: imagen.mimeType, data: imagen.data } },
+          { type: 'text', text: instruccion }
+        ]
+      }
+    ]
+  });
+
+  if (respuesta.stop_reason === 'refusal') {
+    throw new Error('Claude rechazó la solicitud.');
+  }
+  // La respuesta puede empezar con bloques de razonamiento: se busca el de texto.
+  const texto = respuesta.content.find((bloque) => bloque.type === 'text')?.text;
   return interpretarResultado(texto, claves);
 }
 
