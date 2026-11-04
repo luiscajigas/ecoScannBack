@@ -8,14 +8,14 @@ const { db, inicializarBaseDatos } = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3002;
-const origenesPermitidos = (process.env.CORS_ORIGIN || '')
-  .split(',')
-  .map((origen) => origen.trim())
-  .filter(Boolean);
-
-if (process.env.NODE_ENV === 'production' && origenesPermitidos.length === 0) {
-  throw new Error('CORS_ORIGIN es obligatorio en producción.');
-}
+const ORIGEN_PRODUCCION = 'https://eco-scann-fron.vercel.app';
+const origenesPermitidos = [
+  ORIGEN_PRODUCCION,
+  ...(process.env.CORS_ORIGIN || '')
+    .split(',')
+    .map((origen) => origen.trim())
+    .filter(Boolean)
+];
 
 app.use(cors({
   origin(origen, callback) {
