@@ -49,6 +49,14 @@ app.use('/api', escaneosRoutes);
 
 app.use((req, res) => res.status(404).json({ error: 'Ruta no encontrada.' }));
 
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  console.error(err);
+  const mensajes = { 400: 'Solicitud inválida.', 413: 'La imagen es demasiado grande.' };
+  const estado = mensajes[err.status] ? err.status : 500;
+  res.status(estado).json({ error: mensajes[estado] || 'Error interno del servidor.' });
+});
+
 const REINTENTO_BASE_MS = 15000;
 
 function prepararBaseDatos() {
