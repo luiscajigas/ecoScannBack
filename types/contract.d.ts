@@ -4,15 +4,15 @@
  */
 
 export interface paths {
-    "/salud": {
+    "/health": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Estado de la API y de la conexión a la base de datos. */
-        get: operations["consultarSalud"];
+        /** Status of the API and of the database connection. */
+        get: operations["getHealth"];
         put?: never;
         post?: never;
         delete?: never;
@@ -21,7 +21,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/auth/registro": {
+    "/auth/register": {
         parameters: {
             query?: never;
             header?: never;
@@ -30,8 +30,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Crea una cuenta e inicia sesión. */
-        post: operations["registrarUsuario"];
+        /** Creates an account and signs in. */
+        post: operations["registerUser"];
         delete?: never;
         options?: never;
         head?: never;
@@ -47,23 +47,23 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Inicia sesión con correo y contraseña. */
-        post: operations["iniciarSesion"];
+        /** Signs in with email and password. */
+        post: operations["logIn"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/categorias": {
+    "/categories": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Catálogo público de categorías de reciclaje. */
-        get: operations["listarCategorias"];
+        /** Public catalog of recycling categories. */
+        get: operations["listCategories"];
         put?: never;
         post?: never;
         delete?: never;
@@ -72,15 +72,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/usuarios/me": {
+    "/users/me": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Perfil del usuario autenticado. */
-        get: operations["consultarPerfil"];
+        /** Profile of the authenticated user. */
+        get: operations["getProfile"];
         put?: never;
         post?: never;
         delete?: never;
@@ -89,18 +89,18 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/escaneos": {
+    "/scans": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Últimos 50 escaneos del usuario, del más reciente al más antiguo. */
-        get: operations["listarEscaneos"];
+        /** The user's latest 50 scans, newest first. */
+        get: operations["listScans"];
         put?: never;
-        /** Clasifica un residuo con IA, o con la heurística si la IA falla, y suma puntos. */
-        post: operations["registrarEscaneo"];
+        /** Classifies an item with AI, or with the heuristic if AI fails, and awards points. */
+        post: operations["createScan"];
         delete?: never;
         options?: never;
         head?: never;
@@ -112,99 +112,99 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
-         * @description Identificador estable; el frontend traduce a partir de él.
+         * @description Stable identifier; the frontend translates from it.
          * @enum {string}
          */
-        CodigoError: "DATOS_INVALIDOS" | "NO_AUTENTICADO" | "TOKEN_INVALIDO" | "CREDENCIALES_INVALIDAS" | "CORREO_EN_USO" | "CATEGORIA_DESCONOCIDA" | "USUARIO_NO_ENCONTRADO" | "RUTA_NO_ENCONTRADA" | "IMAGEN_DEMASIADO_GRANDE" | "DEMASIADOS_INTENTOS" | "ERROR_INTERNO";
-        ErrorApi: {
-            /** @description Mensaje en español pensado para mostrar o registrar. */
+        ErrorCode: "INVALID_DATA" | "NOT_AUTHENTICATED" | "INVALID_TOKEN" | "INVALID_CREDENTIALS" | "EMAIL_IN_USE" | "UNKNOWN_CATEGORY" | "USER_NOT_FOUND" | "ROUTE_NOT_FOUND" | "IMAGE_TOO_LARGE" | "TOO_MANY_ATTEMPTS" | "INTERNAL_ERROR";
+        ApiError: {
+            /** @description Developer-facing message; users see the frontend's translation of code. */
             error: string;
-            codigo: components["schemas"]["CodigoError"];
+            code: components["schemas"]["ErrorCode"];
         };
         /** @enum {string} */
-        CategoriaClave: "organico" | "papel_carton" | "plastico" | "vidrio" | "metal" | "no_reciclable";
+        CategoryKey: "organic" | "paper_cardboard" | "plastic" | "glass" | "metal" | "non_recyclable";
         /** @enum {string} */
-        ColorContenedor: "verde" | "azul" | "blanco" | "negro";
+        BinColor: "green" | "blue" | "white" | "black";
         /** @enum {string} */
-        OrigenClasificacion: "ia" | "heuristica";
-        Salud: {
+        ClassificationSource: "ai" | "heuristic";
+        Health: {
             /** @enum {string} */
-            estado: "ok" | "error";
-            servicio: string;
+            status: "ok" | "error";
+            service: string;
             /** @enum {string} */
-            baseDatos: "conectada" | "desconectada";
+            database: "connected" | "disconnected";
         };
-        SolicitudRegistro: {
-            nombre: string;
+        RegisterRequest: {
+            name: string;
             /** Format: email */
             email: string;
-            /** @description bcrypt solo tiene en cuenta los primeros 72 bytes. */
+            /** @description bcrypt only takes the first 72 bytes into account. */
             password: string;
         };
-        SolicitudLogin: {
+        LoginRequest: {
             email: string;
             password: string;
         };
-        Usuario: {
+        User: {
             id: number;
-            nombre: string;
+            name: string;
             email: string;
-            puntos: number;
+            points: number;
         };
-        RespuestaAuth: {
+        AuthResponse: {
             token: string;
-            usuario: components["schemas"]["Usuario"];
+            user: components["schemas"]["User"];
         };
-        Categoria: {
-            clave: components["schemas"]["CategoriaClave"];
-            nombre: string;
-            instrucciones: string;
-            color_contenedor: components["schemas"]["ColorContenedor"];
-            puntos: number;
+        Category: {
+            key: components["schemas"]["CategoryKey"];
+            name: string;
+            instructions: string;
+            binColor: components["schemas"]["BinColor"];
+            points: number;
         };
-        Escaneo: {
+        Scan: {
             id: number;
-            categoria_clave: components["schemas"]["CategoriaClave"];
-            categoria_nombre: string;
-            instrucciones: string;
-            color_contenedor: components["schemas"]["ColorContenedor"];
-            confianza: number;
-            origen: components["schemas"]["OrigenClasificacion"];
-            puntos_otorgados: number;
+            categoryKey: components["schemas"]["CategoryKey"];
+            categoryName: string;
+            instructions: string;
+            binColor: components["schemas"]["BinColor"];
+            confidence: number;
+            source: components["schemas"]["ClassificationSource"];
+            pointsAwarded: number;
             /** Format: date-time */
-            creado_en: string;
+            createdAt: string;
         };
-        /** @description categoriaClave y confianza son la clasificación heurística calculada por el Web Worker; el backend solo la usa si la IA no está disponible. */
-        SolicitudEscaneo: {
-            categoriaClave: components["schemas"]["CategoriaClave"];
-            confianza: number;
-            anchoPx: number;
-            altoPx: number;
-            /** @description Imagen comprimida como data URL (JPEG, PNG o WebP). */
-            imagenBase64?: string;
+        /** @description categoryKey and confidence are the heuristic classification computed by the Web Worker; the backend only uses it when AI is unavailable. */
+        ScanRequest: {
+            categoryKey: components["schemas"]["CategoryKey"];
+            confidence: number;
+            widthPx: number;
+            heightPx: number;
+            /** @description Compressed image as a data URL (JPEG, PNG or WebP). */
+            imageBase64?: string;
         };
-        ResultadoEscaneo: {
+        ScanResult: {
             id: number;
-            categoria: {
-                clave: components["schemas"]["CategoriaClave"];
-                nombre: string;
-                instrucciones: string;
-                color_contenedor: components["schemas"]["ColorContenedor"];
+            category: {
+                key: components["schemas"]["CategoryKey"];
+                name: string;
+                instructions: string;
+                binColor: components["schemas"]["BinColor"];
             };
-            origen: components["schemas"]["OrigenClasificacion"];
-            confianza: number;
-            puntosOtorgados: number;
-            puntosTotales: number;
+            source: components["schemas"]["ClassificationSource"];
+            confidence: number;
+            pointsAwarded: number;
+            totalPoints: number;
         };
     };
     responses: {
-        /** @description Error con un código estable para el cliente. */
+        /** @description Error with a stable code for the client. */
         Error: {
             headers: {
                 [name: string]: unknown;
             };
             content: {
-                "application/json": components["schemas"]["ErrorApi"];
+                "application/json": components["schemas"]["ApiError"];
             };
         };
     };
@@ -215,7 +215,7 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    consultarSalud: {
+    getHealth: {
         parameters: {
             query?: never;
             header?: never;
@@ -224,27 +224,27 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description La API y la base de datos funcionan. */
+            /** @description The API and the database are working. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Salud"];
+                    "application/json": components["schemas"]["Health"];
                 };
             };
-            /** @description La API funciona, pero la base de datos no responde. */
+            /** @description The API is working, but the database is not responding. */
             503: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Salud"];
+                    "application/json": components["schemas"]["Health"];
                 };
             };
         };
     };
-    registrarUsuario: {
+    registerUser: {
         parameters: {
             query?: never;
             header?: never;
@@ -253,17 +253,17 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SolicitudRegistro"];
+                "application/json": components["schemas"]["RegisterRequest"];
             };
         };
         responses: {
-            /** @description Cuenta creada. */
+            /** @description Account created. */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RespuestaAuth"];
+                    "application/json": components["schemas"]["AuthResponse"];
                 };
             };
             400: components["responses"]["Error"];
@@ -272,7 +272,7 @@ export interface operations {
             500: components["responses"]["Error"];
         };
     };
-    iniciarSesion: {
+    logIn: {
         parameters: {
             query?: never;
             header?: never;
@@ -281,17 +281,17 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SolicitudLogin"];
+                "application/json": components["schemas"]["LoginRequest"];
             };
         };
         responses: {
-            /** @description Sesión iniciada. */
+            /** @description Signed in. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RespuestaAuth"];
+                    "application/json": components["schemas"]["AuthResponse"];
                 };
             };
             400: components["responses"]["Error"];
@@ -300,7 +300,7 @@ export interface operations {
             500: components["responses"]["Error"];
         };
     };
-    listarCategorias: {
+    listCategories: {
         parameters: {
             query?: never;
             header?: never;
@@ -309,19 +309,19 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Categorías disponibles. */
+            /** @description Available categories. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Categoria"][];
+                    "application/json": components["schemas"]["Category"][];
                 };
             };
             500: components["responses"]["Error"];
         };
     };
-    consultarPerfil: {
+    getProfile: {
         parameters: {
             query?: never;
             header?: never;
@@ -330,13 +330,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Perfil del usuario. */
+            /** @description User profile. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Usuario"];
+                    "application/json": components["schemas"]["User"];
                 };
             };
             401: components["responses"]["Error"];
@@ -344,7 +344,7 @@ export interface operations {
             500: components["responses"]["Error"];
         };
     };
-    listarEscaneos: {
+    listScans: {
         parameters: {
             query?: never;
             header?: never;
@@ -353,20 +353,20 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Historial del usuario. */
+            /** @description User's scan history. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Escaneo"][];
+                    "application/json": components["schemas"]["Scan"][];
                 };
             };
             401: components["responses"]["Error"];
             500: components["responses"]["Error"];
         };
     };
-    registrarEscaneo: {
+    createScan: {
         parameters: {
             query?: never;
             header?: never;
@@ -375,17 +375,17 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SolicitudEscaneo"];
+                "application/json": components["schemas"]["ScanRequest"];
             };
         };
         responses: {
-            /** @description Escaneo registrado. */
+            /** @description Scan saved. */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ResultadoEscaneo"];
+                    "application/json": components["schemas"]["ScanResult"];
                 };
             };
             400: components["responses"]["Error"];

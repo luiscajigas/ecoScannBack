@@ -1,5 +1,5 @@
 {
-  "name": "backend",
+  "name": "ecoscan-backend",
   "version": "1.0.0",
   "description": "",
   "main": "server.js",
@@ -7,8 +7,8 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "node --test",
-    "tipos": "tsc",
-    "contrato:tipos": "openapi-typescript contrato/openapi.yaml -o tipos/contrato.d.ts"
+    "types": "tsc",
+    "contract:types": "openapi-typescript contract/openapi.yaml -o types/contract.d.ts"
   },
   "engines": {
     "node": ">=20"
