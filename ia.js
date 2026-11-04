@@ -62,6 +62,7 @@ async function clasificarConIA(dataUrl, categorias) {
     } catch (err) {
       ultimoError = err;
       console.warn(`Gemini ${modelo} falló: ${err.message}`);
+      if (err.definitivo) break;
     }
   }
   throw ultimoError;
@@ -86,7 +87,9 @@ async function consultarModelo(modelo, cuerpo, claves) {
     } catch {
       mensaje = '';
     }
-    throw new Error(`Gemini respondió ${respuesta.status}${mensaje ? `: ${mensaje.slice(0, 300)}` : '.'}`);
+    const error = new Error(`Gemini respondió ${respuesta.status}${mensaje ? `: ${mensaje.slice(0, 300)}` : '.'}`);
+    error.definitivo = [400, 401, 403].includes(respuesta.status);
+    throw error;
   }
 
   const json = await respuesta.json();
