@@ -28,6 +28,7 @@ router.get('/usuarios/me', requiereAuth, async (req, res) => {
       'SELECT id, nombre, email, puntos FROM usuarios WHERE id = $1',
       [req.usuarioId]
     );
+    if (!resultado.rows[0]) return res.status(404).json({ error: 'Usuario no encontrado.' });
     res.json(resultado.rows[0]);
   } catch (err) {
     console.error(err);
