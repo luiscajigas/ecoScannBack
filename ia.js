@@ -50,8 +50,12 @@ async function clasificarConIA(dataUrl, categorias) {
     }
   };
 
+  return consultarModelo(MODELO, cuerpo, claves);
+}
+
+async function consultarModelo(modelo, cuerpo, claves) {
   const respuesta = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(MODELO)}:generateContent`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelo)}:generateContent`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY },
