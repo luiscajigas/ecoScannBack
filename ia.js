@@ -6,7 +6,7 @@ const MODELOS = [...new Set([
   'gemini-flash-latest',
   'gemini-flash-lite-latest'
 ])];
-const TIMEOUT_MS = 15000;
+const TIMEOUT_MS = 10000;
 const MODELO_CLAUDE = process.env.ANTHROPIC_MODEL || 'claude-haiku-5-5';
 const TIMEOUT_CLAUDE_MS = 15000;
 const DATA_URL = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/;
