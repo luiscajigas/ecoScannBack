@@ -25,18 +25,18 @@ async function clasificarConIA(dataUrl, categorias) {
   const claves = categorias.map((c) => c.clave);
   const descripcion = categorias.map((c) => `- ${c.clave}: ${c.nombre}`).join('\n');
 
+  const instruccion =
+    'Eres un experto en reciclaje. Identifica el residuo principal de la foto y clasifícalo ' +
+    'en exactamente una de estas categorías:\n' +
+    `${descripcion}\n` +
+    'Si la imagen no muestra un residuo claro, usa no_reciclable con confianza baja. ' +
+    'confianza es un número entre 0 y 1.';
+
   const cuerpo = {
     contents: [
       {
         parts: [
-          {
-            text:
-              'Eres un experto en reciclaje. Identifica el residuo principal de la foto y clasifícalo ' +
-              'en exactamente una de estas categorías:\n' +
-              `${descripcion}\n` +
-              'Si la imagen no muestra un residuo claro, usa no_reciclable con confianza baja. ' +
-              'confianza es un número entre 0 y 1.'
-          },
+          { text: instruccion },
           { inline_data: { mime_type: imagen.mimeType, data: imagen.data } }
         ]
       }
