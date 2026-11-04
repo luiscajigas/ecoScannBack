@@ -2,7 +2,7 @@
 
 API en Node.js y Express con autenticación JWT, PostgreSQL y clasificación con IA (Gemini, con Claude como respaldo).
 
-El contrato de la API está en [`contrato/openapi.yaml`](contrato/openapi.yaml). Las decisiones de diseño y sus trade-offs están en [`docs/DECISIONES.md`](docs/DECISIONES.md).
+El contrato de la API está en [`contract/openapi.yaml`](contract/openapi.yaml). Las decisiones de diseño y sus trade-offs están en [`docs/DECISIONES.md`](docs/DECISIONES.md).
 
 ## Ejecutar en local
 
@@ -14,20 +14,20 @@ El contrato de la API está en [`contrato/openapi.yaml`](contrato/openapi.yaml).
 | Comando | Qué hace |
 |---|---|
 | `npm test` | Ejecuta las pruebas; no necesitan base de datos |
-| `npm run tipos` | Comprueba los tipos con TypeScript |
-| `npm run contrato:tipos` | Regenera `tipos/contrato.d.ts` después de cambiar el contrato |
+| `npm run types` | Comprueba los tipos con TypeScript |
+| `npm run contract:types` | Regenera `types/contract.d.ts` después de cambiar el contrato |
 
 ## Estructura
 
 | Carpeta o archivo | Responsabilidad |
 |---|---|
-| `contrato/` | Contrato OpenAPI, la fuente de verdad de la API |
+| `contract/` | Contrato OpenAPI, la fuente de verdad de la API |
 | `server.js` | Arranque: conecta las piezas reales y apaga en orden |
 | `app.js` | Configuración de Express, sin conexiones ni puertos |
 | `routes/` | Controladores HTTP |
-| `servicios/` | Reglas de negocio |
-| `repositorios/` | Consultas SQL |
-| `ia/` | Proveedores de IA y cadena de respaldo |
+| `services/` | Reglas de negocio |
+| `repositories/` | Consultas SQL |
+| `ai/` | Proveedores de IA y cadena de respaldo |
 | `middleware/` | CORS y manejo de errores |
 
 ## Variables en producción (Render)
@@ -46,4 +46,4 @@ El dominio https://eco-scann-fron.vercel.app ya está permitido en CORS.
 
 ## Comprobar el servicio
 
-`GET /api/salud` responde `baseDatos: "conectada"` si todo está bien, o 503 si la base no está disponible.
+`GET /api/health` responde `database: "connected"` si todo está bien, o 503 si la base no está disponible.
