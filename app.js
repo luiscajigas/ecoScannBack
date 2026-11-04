@@ -6,99 +6,99 @@ const helmet = require('helmet').default;
 const { rateLimit } = require('express-rate-limit');
 const OpenApiValidator = require('express-openapi-validator');
 
-const { errores } = require('./errores');
-const { crearOpcionesCors } = require('./middleware/cors');
-const { manejarErrores, rutaNoEncontrada } = require('./middleware/errores');
-const { crearRutasAuth } = require('./routes/auth');
-const { crearRutasEscaneos } = require('./routes/escaneos');
+const { errors } = require('./errors');
+const { createCorsOptions } = require('./middleware/cors');
+const { handleErrors, routeNotFound } = require('./middleware/errors');
+const { createAuthRoutes } = require('./routes/auth');
+const { createScanRoutes } = require('./routes/scans');
 
-const CONTRATO = path.join(__dirname, 'contrato', 'openapi.yaml');
-const LIMITE_CUERPO = '5mb'; // la imagen comprimida viaja como base64
-const VENTANA_INTENTOS_MS = 15 * 60 * 1000;
-const INTENTOS_FALLIDOS_AUTH = 50; // alto a propósito: un salón entero puede compartir la misma IP
+const CONTRACT = path.join(__dirname, 'contract', 'openapi.yaml');
+const BODY_LIMIT = '5mb'; // the compressed image travels as base64
+const ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
+const MAX_FAILED_AUTH_ATTEMPTS = 50; // high on purpose: a whole classroom can share the same IP
 
 /**
- * @typedef {object} OpcionesApp
- * @property {string[]} origenes
- * @property {boolean} produccion
- * @property {() => Promise<unknown>} comprobarBase
- * @property {ReturnType<import('./servicios/auth').crearServicioAuth>} servicioAuth
- * @property {ReturnType<import('./servicios/escaneos').crearServicioEscaneos>} servicioEscaneos
- * @property {ReturnType<import('./repositorios/categorias').crearRepositorioCategorias>} categorias
- * @property {ReturnType<import('./repositorios/escaneos').crearRepositorioEscaneos>} escaneos
- * @property {ReturnType<import('./repositorios/usuarios').crearRepositorioUsuarios>} usuarios
- * @property {boolean} [validarRespuestas] Solo en pruebas: comprueba que las respuestas cumplan el contrato.
- * @property {number} [intentosAuth]
+ * @typedef {object} AppOptions
+ * @property {string[]} origins
+ * @property {boolean} isProduction
+ * @property {() => Promise<unknown>} checkDatabase
+ * @property {ReturnType<import('./services/auth').createAuthService>} authService
+ * @property {ReturnType<import('./services/scans').createScanService>} scanService
+ * @property {ReturnType<import('./repositories/categories').createCategoryRepository>} categories
+ * @property {ReturnType<import('./repositories/scans').createScanRepository>} scans
+ * @property {ReturnType<import('./repositories/users').createUserRepository>} users
+ * @property {boolean} [validateResponses] Tests only: checks that responses follow the contract.
+ * @property {number} [maxAuthAttempts]
  */
 
 /**
- * Construye la app sin abrir conexiones ni puertos, para poder probarla con
- * dependencias simuladas. La conexión real se arma en server.js.
- * @param {OpcionesApp} opciones
+ * Builds the app without opening connections or ports, so it can be tested with
+ * fake dependencies. The real wiring happens in server.js.
+ * @param {AppOptions} options
  */
-function crearApp({
-  origenes,
-  produccion,
-  comprobarBase,
-  servicioAuth,
-  servicioEscaneos,
-  categorias,
-  escaneos,
-  usuarios,
-  validarRespuestas = false,
-  intentosAuth = INTENTOS_FALLIDOS_AUTH
+function createApp({
+  origins,
+  isProduction,
+  checkDatabase,
+  authService,
+  scanService,
+  categories,
+  scans,
+  users,
+  validateResponses = false,
+  maxAuthAttempts = MAX_FAILED_AUTH_ATTEMPTS
 }) {
   const app = express();
 
-  app.set('trust proxy', 1); // Render atiende las peticiones detrás de un proxy
+  app.set('trust proxy', 1); // Render serves requests behind a proxy
   app.use(helmet());
-  app.use(cors(crearOpcionesCors({ origenes, produccion })));
-  app.use(express.json({ limit: LIMITE_CUERPO }));
+  app.use(cors(createCorsOptions({ origins, isProduction })));
+  app.use(express.json({ limit: BODY_LIMIT }));
 
   app.use('/api/auth', rateLimit({
-    windowMs: VENTANA_INTENTOS_MS,
-    limit: intentosAuth,
+    windowMs: ATTEMPT_WINDOW_MS,
+    limit: maxAuthAttempts,
     skipSuccessfulRequests: true,
     standardHeaders: true,
     legacyHeaders: false,
-    handler: (_req, _res, next) => next(errores.demasiadosIntentos())
+    handler: (_req, _res, next) => next(errors.tooManyAttempts())
   }));
 
   app.use(OpenApiValidator.middleware({
-    apiSpec: CONTRATO,
+    apiSpec: CONTRACT,
     validateRequests: true,
-    validateResponses: validarRespuestas,
+    validateResponses,
     validateSecurity: {
       handlers: {
         bearerAuth(req) {
-          const encabezado = req.headers.authorization || '';
-          if (!encabezado.startsWith('Bearer ')) throw errores.noAutenticado();
-          /** @type {import('express').Request} */ (/** @type {unknown} */ (req)).usuarioId =
-            servicioAuth.verificarToken(encabezado.slice('Bearer '.length));
+          const header = req.headers.authorization || '';
+          if (!header.startsWith('Bearer ')) throw errors.notAuthenticated();
+          /** @type {import('express').Request} */ (/** @type {unknown} */ (req)).userId =
+            authService.verifyToken(header.slice('Bearer '.length));
           return true;
         }
       }
     }
   }));
 
-  app.get('/api/salud', async (_req, res) => {
-    const servicio = 'ecoscan-backend';
+  app.get('/api/health', async (_req, res) => {
+    const service = 'ecoscan-backend';
     try {
-      await comprobarBase();
-      res.json({ estado: 'ok', servicio, baseDatos: 'conectada' });
+      await checkDatabase();
+      res.json({ status: 'ok', service, database: 'connected' });
     } catch (err) {
-      console.error('La base de datos no responde:', /** @type {Error} */ (err).message);
-      res.status(503).json({ estado: 'error', servicio, baseDatos: 'desconectada' });
+      console.error('The database is not responding:', /** @type {Error} */ (err).message);
+      res.status(503).json({ status: 'error', service, database: 'disconnected' });
     }
   });
 
-  app.use('/api/auth', crearRutasAuth(servicioAuth));
-  app.use('/api', crearRutasEscaneos({ categorias, escaneos, usuarios, servicioEscaneos }));
+  app.use('/api/auth', createAuthRoutes(authService));
+  app.use('/api', createScanRoutes({ categories, scans, users, scanService }));
 
-  app.use(rutaNoEncontrada);
-  app.use(manejarErrores);
+  app.use(routeNotFound);
+  app.use(handleErrors);
 
   return app;
 }
 
-module.exports = { crearApp };
+module.exports = { createApp };
