@@ -28,7 +28,8 @@ app.use(cors({
     ) {
       return callback(null, true);
     }
-    return callback(new Error('Origen no permitido por CORS.'));
+    console.warn(`Origen rechazado por CORS: ${origen}`);
+    return callback(null, false);
   }
 }));
 app.use(express.json({ limit: '5mb' })); // la imagen comprimida viaja como base64
