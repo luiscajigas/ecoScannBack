@@ -1,4 +1,9 @@
-const MODELO = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+// Si un modelo está saturado se prueba el siguiente; el lite suele tener menos demanda.
+const MODELOS = [...new Set([
+  process.env.GEMINI_MODEL || 'gemini-3.8-flash',
+  'gemini-flash-latest',
+  'gemini-flash-lite-latest'
+])];
 const TIMEOUT_MS = 45000;
 const DATA_URL = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/;
 
@@ -50,7 +55,16 @@ async function clasificarConIA(dataUrl, categorias) {
     }
   };
 
-  return consultarModelo(MODELO, cuerpo, claves);
+  let ultimoError;
+  for (const modelo of MODELOS) {
+    try {
+      return await consultarModelo(modelo, cuerpo, claves);
+    } catch (err) {
+      ultimoError = err;
+      console.warn(`Gemini ${modelo} falló: ${err.message}`);
+    }
+  }
+  throw ultimoError;
 }
 
 async function consultarModelo(modelo, cuerpo, claves) {
