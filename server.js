@@ -49,13 +49,14 @@ app.use('/api', escaneosRoutes);
 
 app.use((req, res) => res.status(404).json({ error: 'Ruta no encontrada.' }));
 
-inicializarBaseDatos()
-  .then(() => {
-    app.listen(PORT, () => {
-      console.log(`Backend de EcoScan escuchando en el puerto ${PORT}`);
-    });
-  })
-  .catch((err) => {
-    console.error('No se pudo iniciar EcoScan:', err);
-    process.exitCode = 1;
-  });
+function prepararBaseDatos() {
+  inicializarBaseDatos()
+    .then(() => console.log('Base de datos lista.'))
+    .catch((err) => console.error('No se pudo preparar la base de datos:', err.message));
+}
+
+app.listen(PORT, (err) => {
+  if (err) throw err;
+  console.log(`Backend de EcoScan escuchando en el puerto ${PORT}`);
+  prepararBaseDatos();
+});
