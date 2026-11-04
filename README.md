@@ -16,7 +16,8 @@ API en Node.js y Express con autenticación JWT, PostgreSQL y clasificación con
 | `JWT_SECRET` | Secreto aleatorio de al menos 32 caracteres |
 | `NODE_ENV` | `production` |
 | `CORS_ORIGIN` | Opcional: dominios extra separados por comas |
-| `GEMINI_API_KEY` | Opcional: sin ella se usa la heurística de color |
+| `GEMINI_API_KEY` | Opcional: IA principal |
+| `ANTHROPIC_API_KEY` | Opcional: Claude se usa solo si Gemini falla. Sin ninguna clave se usa la heurística de color |
 
 El dominio https://eco-scann-fron.vercel.app ya está permitido en CORS.
 
