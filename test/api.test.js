@@ -179,6 +179,76 @@ describe('scans', () => {
   });
 });
 
+describe('history and statistics', () => {
+  const THUMBNAIL = 'data:image/jpeg;base64,AAAA';
+  let api;
+  let token;
+
+  beforeEach(async () => {
+    api = await startApi();
+    token = (await api.request('/auth/register', { method: 'POST', body: USER })).json.token;
+    for (const categoryKey of ['plastic', 'metal', 'plastic']) {
+      await api.request('/scans', { method: 'POST', token, body: { ...SCAN, categoryKey, thumbnailBase64: THUMBNAIL } });
+    }
+  });
+  afterEach(() => api.close());
+
+  test('the history is paginated with the newest first', async () => {
+    const first = await api.request('/scans?limit=2', { token });
+    const second = await api.request('/scans?limit=2&offset=2', { token });
+    assert.deepEqual(first.json.map((s) => s.id), [3, 2]);
+    assert.deepEqual(second.json.map((s) => s.id), [1]);
+  });
+
+  test('the history is filtered by category', async () => {
+    const { json } = await api.request('/scans?category=metal', { token });
+    assert.equal(json.length, 1);
+    assert.equal(json[0].categoryKey, 'metal');
+  });
+
+  test('the history includes the thumbnail', async () => {
+    const { json } = await api.request('/scans', { token });
+    assert.equal(json[0].thumbnail, THUMBNAIL);
+  });
+
+  for (const query of ['limit=0', 'limit=51', 'offset=-1', 'category=gold', 'other=1']) {
+    test(`the contract rejects the query ${query}`, async () => {
+      const { status, json } = await api.request(`/scans?${query}`, { token });
+      assert.equal(status, 400);
+      assert.equal(json.code, 'INVALID_DATA');
+    });
+  }
+
+  test('a thumbnail that is not a JPEG data URL is rejected', async () => {
+    const { status } = await api.request('/scans', { method: 'POST', token, body: { ...SCAN, thumbnailBase64: 'https://evil.example.com/x.png' } });
+    assert.equal(status, 400);
+  });
+
+  test('a thumbnail that is too large is rejected', async () => {
+    const thumbnailBase64 = `data:image/jpeg;base64,${'A'.repeat(30000)}`;
+    const { status } = await api.request('/scans', { method: 'POST', token, body: { ...SCAN, thumbnailBase64 } });
+    assert.equal(status, 400);
+  });
+
+  test('the statistics follow the contract', async () => {
+    const { status, json } = await api.request('/users/me/stats?timeZone=America/Bogota', { token });
+    assert.equal(status, 200);
+    assert.equal(json.totalScans, 3);
+    assert.equal(json.lastSevenDays.length, 7);
+    assert.deepEqual(json.byCategory.map((c) => c.count).sort(), [1, 2]);
+  });
+
+  test('an unknown time zone responds 400', async () => {
+    const { status, json } = await api.request('/users/me/stats?timeZone=Mars/Olympus', { token });
+    assert.equal(status, 400);
+    assert.equal(json.code, 'INVALID_DATA');
+  });
+
+  test('the statistics require a session', async () => {
+    assert.equal((await api.request('/users/me/stats')).status, 401);
+  });
+});
+
 describe('health, routes and CORS', () => {
   test('health reports whether the database responds', async () => {
     const healthy = await startApi();
