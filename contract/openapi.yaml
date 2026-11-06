@@ -120,9 +120,27 @@ paths:
   /scans:
     get:
       operationId: listScans
-      summary: The user's latest 50 scans, newest first.
+      summary: The user's scans, newest first, optionally filtered by category.
       security:
         - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: category
+          in: query
+          schema:
+            $ref: '#/components/schemas/CategoryKey'
       responses:
         '200':
           description: User's scan history.
