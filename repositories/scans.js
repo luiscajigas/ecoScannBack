@@ -3,7 +3,7 @@ const { withTransaction } = require('../db');
 const { errors } = require('../errors');
 
 const FOREIGN_KEY_VIOLATION = '23503';
-const HISTORY_LIMIT = 50;
+const DEFAULT_HISTORY_LIMIT = 50;
 
 /**
  * @typedef {import('../types/contract').components['schemas']['Scan']} Scan
@@ -16,19 +16,20 @@ function createScanRepository(db) {
   return {
     /**
      * @param {number} userId
+     * @param {{ limit?: number, offset?: number, category?: CategoryKey }} [options]
      * @returns {Promise<Scan[]>}
      */
-    async listByUser(userId) {
+    async listByUser(userId, { limit = DEFAULT_HISTORY_LIMIT, offset = 0, category } = {}) {
       const { rows } = await db.query(
         `SELECT s.id, s.category_key AS "categoryKey", c.name AS "categoryName", c.instructions,
                 c.bin_color AS "binColor", s.confidence, s.source,
-                s.points_awarded AS "pointsAwarded", s.created_at AS "createdAt"
+                s.points_awarded AS "pointsAwarded", s.created_at AS "createdAt", s.thumbnail
          FROM scans s
          JOIN categories c ON c.key = s.category_key
-         WHERE s.user_id = $1
-         ORDER BY s.created_at DESC
-         LIMIT $2`,
-        [userId, HISTORY_LIMIT]
+         WHERE s.user_id = $1 AND ($4::text IS NULL OR s.category_key = $4)
+         ORDER BY s.created_at DESC, s.id DESC
+         LIMIT $2 OFFSET $3`,
+        [userId, limit, offset, category ?? null]
       );
       return rows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }));
     },
