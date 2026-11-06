@@ -24,6 +24,7 @@ const MAX_FAILED_AUTH_ATTEMPTS = 50; // high on purpose: a whole classroom can s
  * @property {() => Promise<unknown>} checkDatabase
  * @property {ReturnType<import('./services/auth').createAuthService>} authService
  * @property {ReturnType<import('./services/scans').createScanService>} scanService
+ * @property {ReturnType<import('./services/stats').createStatsService>} statsService
  * @property {ReturnType<import('./repositories/categories').createCategoryRepository>} categories
  * @property {ReturnType<import('./repositories/scans').createScanRepository>} scans
  * @property {ReturnType<import('./repositories/users').createUserRepository>} users
@@ -42,6 +43,7 @@ function createApp({
   checkDatabase,
   authService,
   scanService,
+  statsService,
   categories,
   scans,
   users,
@@ -93,7 +95,7 @@ function createApp({
   });
 
   app.use('/api/auth', createAuthRoutes(authService));
-  app.use('/api', createScanRoutes({ categories, scans, users, scanService }));
+  app.use('/api', createScanRoutes({ categories, scans, users, scanService, statsService }));
 
   app.use(routeNotFound);
   app.use(handleErrors);

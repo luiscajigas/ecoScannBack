@@ -10,6 +10,7 @@ const { createScanRepository } = require('./repositories/scans');
 const { createUserRepository } = require('./repositories/users');
 const { createAuthService } = require('./services/auth');
 const { createScanService } = require('./services/scans');
+const { createStatsService } = require('./services/stats');
 
 const DATABASE_RETRY_MS = 15000;
 const SHUTDOWN_LIMIT_MS = 10000;
@@ -34,6 +35,7 @@ const app = createApp({
   checkDatabase: () => db.query('SELECT 1'),
   authService: createAuthService({ users, jwtSecret: config.jwtSecret }),
   scanService: createScanService({ categories, scans, classifier }),
+  statsService: createStatsService({ scans }),
   categories,
   scans,
   users
