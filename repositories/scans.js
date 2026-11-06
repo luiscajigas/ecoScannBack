@@ -35,6 +35,32 @@ function createScanRepository(db) {
     },
 
     /**
+     * Counts per category and per day; each day is computed in the user's time zone.
+     * @param {number} userId
+     * @param {string} timeZone
+     * @returns {Promise<{ byCategory: { categoryKey: CategoryKey, count: number }[], daily: { date: string, count: number }[] }>}
+     */
+    async getStatsData(userId, timeZone) {
+      const [byCategory, daily] = await Promise.all([
+        db.query(
+          `SELECT category_key AS "categoryKey", COUNT(*)::int AS count
+           FROM scans WHERE user_id = $1
+           GROUP BY category_key
+           ORDER BY count DESC, category_key`,
+          [userId]
+        ),
+        db.query(
+          `SELECT TO_CHAR(created_at AT TIME ZONE $2, 'YYYY-MM-DD') AS date, COUNT(*)::int AS count
+           FROM scans WHERE user_id = $1
+           GROUP BY date
+           ORDER BY date`,
+          [userId, timeZone]
+        )
+      ]);
+      return { byCategory: byCategory.rows, daily: daily.rows };
+    },
+
+    /**
      * Saves the scan and adds the points in a single transaction.
      * @param {object} data
      * @param {number} data.userId
