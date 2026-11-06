@@ -225,6 +225,11 @@ async function initializeDatabase(db) {
       );
     `);
 
+    await client.query(`
+      ALTER TABLE scans ADD COLUMN IF NOT EXISTS thumbnail TEXT;
+      CREATE INDEX IF NOT EXISTS scans_user_created_idx ON scans (user_id, created_at DESC);
+    `);
+
     for (const category of CATEGORIES) {
       await client.query(
         `INSERT INTO categories (key, name, instructions, bin_color, points)
