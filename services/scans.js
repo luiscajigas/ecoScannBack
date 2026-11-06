@@ -56,7 +56,8 @@ function createScanService({ categories, scans, classifier }) {
         source,
         widthPx: request.widthPx,
         heightPx: request.heightPx,
-        points: category.points
+        points: category.points,
+        thumbnail: request.thumbnailBase64 ?? null
       });
 
       return {

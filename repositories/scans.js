@@ -44,16 +44,17 @@ function createScanRepository(db) {
      * @param {number} data.widthPx
      * @param {number} data.heightPx
      * @param {number} data.points
+     * @param {string | null} data.thumbnail
      * @returns {Promise<{ id: number, totalPoints: number }>}
      */
-    async create({ userId, categoryKey, confidence, source, widthPx, heightPx, points }) {
+    async create({ userId, categoryKey, confidence, source, widthPx, heightPx, points, thumbnail }) {
       try {
         return await withTransaction(db, async (client) => {
           const scan = await client.query(
-            `INSERT INTO scans (user_id, category_key, confidence, source, width_px, height_px, points_awarded)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)
+            `INSERT INTO scans (user_id, category_key, confidence, source, width_px, height_px, points_awarded, thumbnail)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
              RETURNING id`,
-            [userId, categoryKey, confidence, source, widthPx, heightPx, points]
+            [userId, categoryKey, confidence, source, widthPx, heightPx, points, thumbnail]
           );
           const user = await client.query(
             'UPDATE users SET points = points + $1 WHERE id = $2 RETURNING points',
