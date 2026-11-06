@@ -318,6 +318,7 @@ components:
         - source
         - pointsAwarded
         - createdAt
+        - thumbnail
       properties:
         id:
           type: integer
@@ -338,6 +339,10 @@ components:
         createdAt:
           type: string
           format: date-time
+        thumbnail:
+          type: string
+          nullable: true
+          description: Small JPEG preview as a data URL; null for scans saved before thumbnails existed.
 
     ScanRequest:
       type: object
@@ -362,6 +367,11 @@ components:
         imageBase64:
           type: string
           description: Compressed image as a data URL (JPEG, PNG or WebP).
+        thumbnailBase64:
+          type: string
+          maxLength: 30000
+          pattern: '^data:image/jpeg;base64,[A-Za-z0-9+/=]+$'
+          description: Small preview stored with the scan; the full image is not stored.
 
     ScanResult:
       type: object
