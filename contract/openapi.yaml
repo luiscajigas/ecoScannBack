@@ -127,6 +127,7 @@ paths:
         - name: timeZone
           in: query
           description: IANA time zone that decides where each day starts, for example America/Bogota.
+          allowReserved: true
           schema:
             type: string
             maxLength: 64
