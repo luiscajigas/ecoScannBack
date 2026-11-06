@@ -2,6 +2,7 @@ const { createApp } = require('../app');
 const { errors } = require('../errors');
 const { createAuthService } = require('../services/auth');
 const { createScanService } = require('../services/scans');
+const { createStatsService } = require('../services/stats');
 
 const JWT_SECRET = 'x'.repeat(40);
 
@@ -37,10 +38,22 @@ function createFakeRepositories() {
   const categories = { list: async () => CATEGORIES };
 
   const scans = {
-    async listByUser(userId) {
-      return history.filter((s) => s.userId === userId).map(({ userId: _id, ...scan }) => scan);
+    async listByUser(userId, { limit = 50, offset = 0, category } = {}) {
+      return history
+        .filter((s) => s.userId === userId && (!category || s.categoryKey === category))
+        .reverse()
+        .slice(offset, offset + limit)
+        .map(({ userId: _id, ...scan }) => scan);
     },
-    async create({ userId, categoryKey, confidence, source, points }) {
+    async getStatsData(userId) {
+      const own = history.filter((s) => s.userId === userId);
+      const count = (values) => [...new Set(values)].map((value) => [value, values.filter((v) => v === value).length]);
+      return {
+        byCategory: count(own.map((s) => s.categoryKey)).map(([categoryKey, total]) => ({ categoryKey, count: total })),
+        daily: count(own.map((s) => s.createdAt.slice(0, 10))).map(([date, total]) => ({ date, count: total }))
+      };
+    },
+    async create({ userId, categoryKey, confidence, source, points, thumbnail }) {
       const user = userList.find((u) => u.id === userId);
       if (!user) throw errors.invalidToken();
       user.points += points;
@@ -56,7 +69,8 @@ function createFakeRepositories() {
         confidence,
         source,
         pointsAwarded: points,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        thumbnail
       });
       return { id, totalPoints: user.points };
     }
@@ -81,6 +95,7 @@ async function startApi({ classifier, checkDatabase, maxAuthAttempts, isProducti
       scans: repositories.scans,
       classifier: classifier ?? { isAvailable: false, classify: async () => { throw new Error('no AI'); } }
     }),
+    statsService: createStatsService({ scans: repositories.scans }),
     ...repositories,
     validateResponses: true,
     maxAuthAttempts
