@@ -117,6 +117,34 @@ paths:
         '500':
           $ref: '#/components/responses/Error'
 
+  /users/me/stats:
+    get:
+      operationId: getUserStats
+      summary: Totals, streaks and recent activity of the authenticated user.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: timeZone
+          in: query
+          description: IANA time zone that decides where each day starts, for example America/Bogota.
+          schema:
+            type: string
+            maxLength: 64
+            default: UTC
+      responses:
+        '200':
+          description: User statistics.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserStats'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+
   /scans:
     get:
       operationId: listScans
@@ -361,6 +389,44 @@ components:
           type: string
           nullable: true
           description: Small JPEG preview as a data URL; null for scans saved before thumbnails existed.
+
+    UserStats:
+      type: object
+      additionalProperties: false
+      required: [totalScans, currentStreak, longestStreak, byCategory, lastSevenDays]
+      properties:
+        totalScans:
+          type: integer
+        currentStreak:
+          type: integer
+          description: Consecutive days with scans, up to today or yesterday.
+        longestStreak:
+          type: integer
+        byCategory:
+          type: array
+          description: Only categories with scans, from most to least frequent.
+          items:
+            type: object
+            additionalProperties: false
+            required: [categoryKey, count]
+            properties:
+              categoryKey:
+                $ref: '#/components/schemas/CategoryKey'
+              count:
+                type: integer
+        lastSevenDays:
+          type: array
+          description: Exactly seven days, oldest first, including days without scans.
+          items:
+            type: object
+            additionalProperties: false
+            required: [date, count]
+            properties:
+              date:
+                type: string
+                format: date
+              count:
+                type: integer
 
     ScanRequest:
       type: object

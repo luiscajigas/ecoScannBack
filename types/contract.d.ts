@@ -89,6 +89,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/users/me/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Totals, streaks and recent activity of the authenticated user. */
+        get: operations["getUserStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/scans": {
         parameters: {
             query?: never;
@@ -96,7 +113,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The user's latest 50 scans, newest first. */
+        /** The user's scans, newest first, optionally filtered by category. */
         get: operations["listScans"];
         put?: never;
         /** Classifies an item with AI, or with the heuristic if AI fails, and awards points. */
@@ -173,6 +190,25 @@ export interface components {
             pointsAwarded: number;
             /** Format: date-time */
             createdAt: string;
+            /** @description Small JPEG preview as a data URL; null for scans saved before thumbnails existed. */
+            thumbnail: string | null;
+        };
+        UserStats: {
+            totalScans: number;
+            /** @description Consecutive days with scans, up to today or yesterday. */
+            currentStreak: number;
+            longestStreak: number;
+            /** @description Only categories with scans, from most to least frequent. */
+            byCategory: {
+                categoryKey: components["schemas"]["CategoryKey"];
+                count: number;
+            }[];
+            /** @description Exactly seven days, oldest first, including days without scans. */
+            lastSevenDays: {
+                /** Format: date */
+                date: string;
+                count: number;
+            }[];
         };
         /** @description categoryKey and confidence are the heuristic classification computed by the Web Worker; the backend only uses it when AI is unavailable. */
         ScanRequest: {
@@ -182,6 +218,8 @@ export interface components {
             heightPx: number;
             /** @description Compressed image as a data URL (JPEG, PNG or WebP). */
             imageBase64?: string;
+            /** @description Small preview stored with the scan; the full image is not stored. */
+            thumbnailBase64?: string;
         };
         ScanResult: {
             id: number;
@@ -344,9 +382,39 @@ export interface operations {
             500: components["responses"]["Error"];
         };
     };
+    getUserStats: {
+        parameters: {
+            query?: {
+                /** @description IANA time zone that decides where each day starts, for example America/Bogota. */
+                timeZone?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description User statistics. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserStats"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            500: components["responses"]["Error"];
+        };
+    };
     listScans: {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+                offset?: number;
+                category?: components["schemas"]["CategoryKey"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
