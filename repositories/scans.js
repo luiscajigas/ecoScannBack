@@ -1,5 +1,5 @@
 // @ts-check
-const { withTransaction } = require('../db');
+const { withTransaction } = require('../db/pool');
 const { errors } = require('../errors');
 
 const FOREIGN_KEY_VIOLATION = '23503';
