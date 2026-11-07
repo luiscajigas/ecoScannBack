@@ -55,7 +55,7 @@ function createAuthService({ users, jwtSecret }) {
       } catch {
         throw errors.invalidToken();
       }
-      // Rejects correctly signed tokens with another shape, such as those issued before the English rename.
+      // A valid signature is not enough: the payload must have the expected shape.
       if (typeof payload.userId !== 'number') throw errors.invalidToken();
       return payload.userId;
     }

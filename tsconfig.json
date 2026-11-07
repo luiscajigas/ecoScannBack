@@ -11,5 +11,5 @@
     "skipLibCheck": true,
     "types": ["node", "express"]
   },
-  "include": ["*.js", "ai", "middleware", "repositories", "routes", "services", "types"]
+  "include": ["*.js", "ai", "db", "middleware", "repositories", "routes", "services", "types"]
 }

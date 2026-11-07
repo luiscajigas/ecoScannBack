@@ -1,6 +1,7 @@
 // @ts-check
 const { loadConfig } = require('./config');
-const { createPool, initializeDatabase } = require('./db');
+const { createPool } = require('./db/pool');
+const { initializeDatabase } = require('./db/schema');
 const { createApp } = require('./app');
 const { createClassifier } = require('./ai/classifier');
 const { createGeminiProvider } = require('./ai/gemini');

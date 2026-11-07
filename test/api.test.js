@@ -105,9 +105,9 @@ describe('protected routes', () => {
     assert.equal(json.code, 'INVALID_TOKEN');
   });
 
-  test('a signed token from before the rename responds 401 INVALID_TOKEN', async () => {
-    const legacyToken = jwt.sign({ usuarioId: 1 }, JWT_SECRET, { algorithm: 'HS256' });
-    const { status, json } = await api.request('/scans', { token: legacyToken });
+  test('a correctly signed token with another shape responds 401 INVALID_TOKEN', async () => {
+    const otherToken = jwt.sign({ subject: 1 }, JWT_SECRET, { algorithm: 'HS256' });
+    const { status, json } = await api.request('/scans', { token: otherToken });
     assert.equal(status, 401);
     assert.equal(json.code, 'INVALID_TOKEN');
   });
