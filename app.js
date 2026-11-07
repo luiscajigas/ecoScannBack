@@ -12,6 +12,7 @@ const { handleErrors, routeNotFound } = require('./middleware/errors');
 const { createAuthRoutes } = require('./routes/auth');
 const { createCategoryRoutes } = require('./routes/categories');
 const { createScanRoutes } = require('./routes/scans');
+const { createUserRoutes } = require('./routes/users');
 
 const CONTRACT = path.join(__dirname, 'contract', 'openapi.yaml');
 const BODY_LIMIT = '5mb'; // the compressed image travels as base64
@@ -97,7 +98,8 @@ function createApp({
 
   app.use('/api/auth', createAuthRoutes(authService));
   app.use('/api/categories', createCategoryRoutes(categories));
-  app.use('/api', createScanRoutes({ scans, users, scanService, statsService }));
+  app.use('/api/users', createUserRoutes({ users, statsService }));
+  app.use('/api/scans', createScanRoutes({ scans, scanService }));
 
   app.use(routeNotFound);
   app.use(handleErrors);
