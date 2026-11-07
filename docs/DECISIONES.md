@@ -6,9 +6,7 @@ Cada decisión indica qué se eligió, qué se gana y qué se paga a cambio.
 
 **Decisión:** todo el código está en inglés: archivos, identificadores, comentarios, logs, API y base de datos. Solo queda en español lo que ve el usuario.
 
-**Migración:** `db.js` renombra el esquema original al arrancar, dentro de una transacción: si algo falla, la base queda como estaba. Por eso ese archivo todavía nombra las tablas viejas. Es lo único en español que queda en el código, junto con una prueba de tokens antiguos.
-
-**Se paga:** los tokens emitidos antes del cambio dejan de servir y hay que volver a iniciar sesión.
+**Migración ya aplicada:** el esquema original en español se renombró en producción con una migración que luego se retiró del código; sigue disponible en el historial de Git. Solo queda en español el contenido que ven los usuarios, como los nombres e instrucciones de las categorías.
 
 ## Contract-first
 
@@ -44,17 +42,25 @@ Cada decisión indica qué se eligió, qué se gana y qué se paga a cambio.
 ## Capas y patrones
 
 ```
-routes → services → repositories → PostgreSQL
-              ↓
-          ai/classifier → Gemini → Claude
+routes → services → repositories → db → PostgreSQL
+             ↓
+       ai/classifier → Gemini → Claude
 ```
 
-- **Repositorio:** solo `repositories/` conoce el SQL.
-- **Raíz de composición:** `server.js` es el único lugar que conecta las piezas reales; `app.js` no abre conexiones ni puertos, y por eso se puede probar.
-- **Cadena de responsabilidad:** `ai/classifier.js` intenta cada proveedor en orden. Agregar un proveedor no cambia ese archivo.
-- **Estrategia:** Gemini y Claude cumplen la misma interfaz `AiProvider`.
+Las rutas que solo leen datos sin reglas de negocio (categorías, perfil, historial) llaman directamente al repositorio: un servicio que solo reenvía la llamada agregaría código sin aportar nada.
+
+| Patrón | Dónde | Para qué |
+|---|---|---|
+| **Repositorio** | `repositories/` | Solo esta capa conoce el SQL |
+| **Fábrica con inyección de dependencias** | `create*Service`, `create*Repository` | Las dependencias entran como parámetros, y en pruebas se reemplazan por versiones en memoria |
+| **Raíz de composición** | `server.js` | Es el único lugar que conecta las piezas reales; `app.js` no abre conexiones ni puertos |
+| **Cadena de responsabilidad** | `ai/classifier.js` | Intenta cada proveedor en orden; agregar uno no cambia ese archivo |
+| **Estrategia** | `ai/gemini.js`, `ai/claude.js` | Ambos cumplen la misma interfaz `AiProvider` |
+| **Middleware** | `middleware/`, `app.js` | CORS, validación y errores se resuelven antes y después de las rutas |
 
 **Se paga:** más archivos que antes. Para un proyecto de este tamaño es el límite razonable, y por eso no hay una capa de controladores aparte.
+
+**Excepción consciente:** los repositorios traducen algunos errores de PostgreSQL a `ApiError`, como el correo repetido. Una separación estricta usaría errores de dominio, pero duplicaría una jerarquía de errores sin beneficio aquí.
 
 ## Hilos y concurrencia
 

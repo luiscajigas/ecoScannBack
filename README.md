@@ -14,6 +14,7 @@ El contrato de la API está en [`contract/openapi.yaml`](contract/openapi.yaml).
 | Comando | Qué hace |
 |---|---|
 | `npm test` | Ejecuta las pruebas; no necesitan base de datos |
+| `npm run lint` | Revisa el código con ESLint |
 | `npm run types` | Comprueba los tipos con TypeScript |
 | `npm run contract:types` | Regenera `types/contract.d.ts` después de cambiar el contrato |
 
@@ -27,6 +28,7 @@ El contrato de la API está en [`contract/openapi.yaml`](contract/openapi.yaml).
 | `routes/` | Controladores HTTP |
 | `services/` | Reglas de negocio |
 | `repositories/` | Consultas SQL |
+| `db/` | Conexión, transacciones y esquema |
 | `ai/` | Proveedores de IA y cadena de respaldo |
 | `middleware/` | CORS y manejo de errores |
 
