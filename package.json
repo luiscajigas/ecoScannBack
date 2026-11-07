@@ -8,7 +8,8 @@
     "dev": "node --watch server.js",
     "test": "node --test",
     "types": "tsc",
-    "contract:types": "openapi-typescript contract/openapi.yaml -o types/contract.d.ts"
+    "contract:types": "openapi-typescript contract/openapi.yaml -o types/contract.d.ts",
+    "lint": "eslint ."
   },
   "engines": {
     "node": ">=20"
@@ -29,11 +30,14 @@
     "pg": "^8.16.3"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^26.6.6",
     "@types/pg": "^8.23.1",
+    "eslint": "^9.39.5",
+    "globals": "^17.14.0",
     "openapi-typescript": "^7.13.0",
     "typescript": "^5.9.3"
   },
