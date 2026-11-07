@@ -10,6 +10,7 @@ const { errors } = require('./errors');
 const { createCorsOptions } = require('./middleware/cors');
 const { handleErrors, routeNotFound } = require('./middleware/errors');
 const { createAuthRoutes } = require('./routes/auth');
+const { createCategoryRoutes } = require('./routes/categories');
 const { createScanRoutes } = require('./routes/scans');
 
 const CONTRACT = path.join(__dirname, 'contract', 'openapi.yaml');
@@ -95,7 +96,8 @@ function createApp({
   });
 
   app.use('/api/auth', createAuthRoutes(authService));
-  app.use('/api', createScanRoutes({ categories, scans, users, scanService, statsService }));
+  app.use('/api/categories', createCategoryRoutes(categories));
+  app.use('/api', createScanRoutes({ scans, users, scanService, statsService }));
 
   app.use(routeNotFound);
   app.use(handleErrors);
