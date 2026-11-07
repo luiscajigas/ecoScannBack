@@ -179,6 +179,8 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Scan'
+        '400':
+          $ref: '#/components/responses/Error'
         '401':
           $ref: '#/components/responses/Error'
         '500':
