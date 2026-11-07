@@ -18,7 +18,7 @@ class ApiError extends Error {
 }
 
 const errors = {
-  invalidData: () => new ApiError(400, 'INVALID_DATA', 'Invalid data: use a valid email and a password of at least 8 characters.'),
+  invalidData: () => new ApiError(400, 'INVALID_DATA', 'The request data is invalid.'),
   notAuthenticated: () => new ApiError(401, 'NOT_AUTHENTICATED', 'Not authenticated: the token is missing.'),
   invalidToken: () => new ApiError(401, 'INVALID_TOKEN', 'Invalid or expired token.'),
   invalidCredentials: () => new ApiError(401, 'INVALID_CREDENTIALS', 'Invalid credentials.'),
